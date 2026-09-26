@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Last Asylum — Alliance Map</title>
+<meta name="description" content="Общая интерактивная карта альянсов Last Asylum">
+<style>
+:root {
+  color-scheme: dark;
+  --bg:#0b110d; --panel:#131a17; --panel2:#1a231f; --line:#2b3931;
+  --text:#eef5ef; --muted:#9db0a1; --danger:#b95454;
+  --green-base:#78934f; --green-stroke:#2b3c1e; --ok:#79b866; --warn:#d0a25e;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+button,input,textarea{font:inherit} button{color:inherit}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr) 310px;min-height:100vh}
+.sidebar,.editor{background:var(--panel)} .sidebar{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.editor{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.head{padding:16px;border-bottom:1px solid var(--line)} .title{font-size:21px;font-weight:800} .subtitle{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.section{padding:14px 16px;border-bottom:1px solid var(--line)} .section.grow{flex:1 1 auto;min-height:180px;display:flex;flex-direction:column}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.11em;color:#b0c1b4;font-weight:800;margin-bottom:10px}
+.add-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 46px;gap:8px}
+input[type=text],input[type=email],input[type=password],textarea{width:100%;min-width:0;padding:10px 11px;border-radius:10px;border:1px solid #324038;background:#0d1411;color:var(--text);outline:none}
+input:focus,textarea:focus{border-color:#7fa95c;box-shadow:0 0 0 2px rgba(127,169,92,.14)}
+input[type=color]{width:52px;height:42px;padding:3px;border:1px solid #324038;border-radius:10px;background:#0d1411}
+textarea{min-height:92px;resize:vertical}
+.btn{min-height:40px;border:1px solid #35453b;background:#202a24;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}
+.btn:hover:not(:disabled){background:#29372f} .btn:disabled,.tool:disabled{opacity:.42;cursor:not-allowed} .btn.danger{background:#3b2323;border-color:#6a3f3f}
+.btn.primary{background:#2b402a;border-color:#587549}
+.note,.small{font-size:12px;line-height:1.45;color:var(--muted);margin-top:8px}
+.alliance-list{display:flex;flex-direction:column;gap:8px;overflow:auto;flex:1}
+.alliance-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--panel2);border:1px solid transparent;cursor:pointer}
+.alliance-row.active{background:#213027;border-color:#6d8f57} .swatch{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.32);flex:0 0 auto}
+.alliance-name{font-weight:800;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .count{font-size:11px;color:var(--muted)}
+.bottom-actions{padding:14px 16px;border-top:1px solid var(--line)}
+.main{min-width:0;display:flex;flex-direction:column}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:#101612}
+.tools{display:flex;gap:8px;flex-wrap:wrap} .tool{min-height:40px;display:inline-flex;align-items:center;gap:7px;border:1px solid #35453b;background:#1c251f;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:750}
+.tool.active{background:#263426;border-color:#74985c;color:#e1f3d5} .spacer{flex:1} .coord{font-size:12px;color:#bfccc4;min-width:110px;text-align:right}
+.online-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #344239;border-radius:999px;font-size:12px;color:#c9d5cc;background:#17201b}
+.online-dot{width:8px;height:8px;border-radius:50%;background:#777} .online-pill.ok .online-dot{background:var(--ok)} .online-pill.warn .online-dot{background:var(--warn)} .online-pill.bad .online-dot{background:#c15a5a}
+.viewport{position:relative;flex:1;min-height:680px;overflow:hidden;touch-action:none;background:radial-gradient(circle at center,#17211a 0,#0b100d 72%)}
+.mover{position:absolute;left:50%;top:50%;width:min(92%,1100px);aspect-ratio:1000/830;transform-origin:0 0;will-change:transform}
+.map-board{position:absolute;inset:0;background:var(--green-base);border:1px solid #5f6d4d;box-shadow:0 14px 34px rgba(0,0,0,.38);overflow:hidden}
+#overlay{position:absolute;inset:0;width:100%;height:100%;display:block;background:var(--green-base)} .base-bg{fill:var(--green-base)}
+.zone-fill{fill:rgba(255,255,255,.10);stroke:var(--green-stroke);stroke-width:2.1;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill .12s ease}
+.zone-fill.royal{fill:rgba(255,255,255,.20)} .zone-fill:hover{filter:brightness(1.05)}
+.alliance-tag{font-size:18px;font-weight:900;fill:#eef7ea;paint-order:stroke;stroke:#243018;stroke-width:4;stroke-linejoin:round;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+.level-label{font-size:13px;font-weight:800;fill:#eef7ea;paint-order:stroke;stroke:#243018;stroke-width:3.5;stroke-linejoin:round;pointer-events:none;text-anchor:middle;dominant-baseline:central;opacity:.95}
+.royal-label{font-size:22px;font-weight:900;fill:#203018;pointer-events:none;text-anchor:middle} .royal-sub{font-size:16px;font-weight:800;fill:#203018;pointer-events:none;text-anchor:middle}
+.marker{cursor:pointer} .marker text{fill:white;font-size:20px;font-weight:800;paint-order:stroke;stroke:#111;stroke-width:4;stroke-linejoin:round;pointer-events:none;dominant-baseline:middle}
+.marker.selected path{stroke:#fff;stroke-width:3.5}
+.help{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(9,14,11,.86);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;font-size:11px;color:#bfccc3;pointer-events:none;max-width:660px}
+.editor-empty{padding:18px 16px;color:var(--muted);font-size:13px;line-height:1.5} .field{margin-bottom:12px} .field label{display:block;font-size:12px;color:#b4c5b8;font-weight:700;margin-bottom:6px}
+.pin-preview{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3d35;border-radius:12px;background:var(--panel2);margin-top:4px}
+.preview-pin{width:20px;height:20px;border-radius:50%;background:#d55353;border:2px solid rgba(255,255,255,.45)} .editor-actions{display:flex;gap:8px;flex-wrap:wrap}
+.status-card{display:flex;flex-direction:column;gap:8px;background:var(--panel2);border:1px solid #25312a;border-radius:12px;padding:10px 12px}
+.status-line{display:flex;justify-content:space-between;gap:8px;font-size:13px} .status-line strong{color:#d6e8d8}
+.auth-grid{display:grid;gap:8px} .hidden{display:none!important}
+.setup-box{padding:12px;border:1px solid #6f5b36;border-radius:12px;background:#2a2418;color:#ead7af;font-size:12px;line-height:1.5}
+.toast{position:absolute;right:14px;top:14px;z-index:10;max-width:380px;padding:10px 12px;border-radius:10px;background:#121a15;border:1px solid #395044;color:#eaf2ec;font-size:12px;box-shadow:0 8px 26px rgba(0,0,0,.28)}
+@media(max-width:1100px){.app{grid-template-columns:260px minmax(0,1fr)}.editor{display:none}}
+@media(max-width:820px){.app{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--line)}.viewport{min-height:70vh}.mover{width:96%}.coord{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="head">
+      <div class="title" id="mapTitle">Last Asylum Alliance Map</div>
+      <div class="subtitle">ONLINE · одна общая карта для всех игроков.</div>
+    </div>
+
+    <section class="section">
+      <div class="section-title">Добавить альянс</div>
+      <div class="add-row">
+        <input id="allianceName" type="text" maxlength="18" placeholder="Тег альянса">
+        <input id="allianceColor" type="color" value="#38a169" aria-label="Цвет альянса">
+        <button id="addAlliance" class="btn" type="button">＋</button>
+      </div>
+      <div id="allianceMessage" class="note">Редактирование доступно после входа.</div>
+    </section>
+
+    <section class="section grow">
+      <div class="section-title">Альянсы</div>
+      <div id="allianceList" class="alliance-list"></div>
+    </section>
+
+    <div class="bottom-actions">
+      <button id="deleteAlliance" class="btn danger" type="button" style="width:100%">Удалить альянс</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="tools" role="group" aria-label="Инструменты">
+        <button class="tool active" data-tool="paint" type="button">🎨 <span>Выбор</span></button>
+        <button class="tool" data-tool="marker" type="button">📍 <span>Метка</span></button>
+        <button class="tool" data-tool="pan" type="button">✋ <span>Карта</span></button>
+        <button class="tool" data-tool="erase" type="button">🧽 <span>Ластик</span></button>
+      </div>
+      <div class="spacer"></div>
+      <div id="onlineStatus" class="online-pill warn"><span class="online-dot"></span><span id="onlineText">Подключение…</span></div>
+      <button id="zoomOut" class="btn" type="button">−</button>
+      <button id="zoomIn" class="btn" type="button">＋</button>
+      <button id="resetView" class="btn" type="button">Сброс</button>
+      <div id="coord" class="coord">X: — · Y: —</div>
+    </div>
+
+    <div id="viewport" class="viewport">
+      <div id="toast" class="toast hidden"></div>
+      <div id="mover" class="mover">
+        <div class="map-board">
+          <svg id="overlay" viewBox="0 0 1000 830" preserveAspectRatio="none" aria-label="Карта Last Asylum">
+            <rect class="base-bg" x="0" y="0" width="1000" height="830"></rect>
+            <g id="zoneLayer"></g>
+            <g id="tagLayer"></g>
+            <g id="levelLayer"></g>
+            <g id="markerLayer"></g>
+            <g id="royalLayer"></g>
+          </svg>
+        </div>
+      </div>
+      <div class="help">Игроки без входа видят общую карту. Редакторы после входа могут красить территории, добавлять/удалять альянсы и работать с метками. Изменения синхронизируются через Supabase Realtime.</div>
+    </div>
+  </main>
+
+  <aside class="editor">
+    <div class="head">
+      <div class="title" style="font-size:19px">Доступ и метки</div>
+      <div class="subtitle" id="accessSubtitle">Публичный просмотр</div>
+    </div>
+
+    <section class="section">
+      <div class="section-title">Редактор</div>
+      <div id="setupBox" class="setup-box hidden">Supabase ещё не настроен. Заполните <b>config.js</b>, затем обновите страницу.</div>
+      <div id="loginBox" class="auth-grid">
+        <input id="editorCode" type="password" autocomplete="off" placeholder="Код редактора">
+        <button id="loginBtn" class="btn primary" type="button">Войти как редактор</button>
+      </div>
+      <div id="logoutBox" class="hidden">
+        <div class="status-card">
+          <div class="status-line"><span>Режим</span><strong>Редактор</strong></div>
+          <div class="status-line"><span>Пользователь</span><strong id="userEmail">—</strong></div>
+        </div>
+        <button id="logoutBtn" class="btn" type="button" style="width:100%;margin-top:8px">Выйти</button>
+      </div>
+      <div id="authMessage" class="note"></div>
+    </section>
+
+    <div id="markerEmpty" class="editor-empty">Метка не выбрана. Инструмент «Метка» ставит булавку. После этого здесь можно изменить текст, цвет и комментарий.</div>
+
+    <section id="markerEditor" class="section hidden">
+      <div class="section-title">Редактор метки</div>
+      <div class="field"><label for="markerText">Текст рядом с булавкой</label><input id="markerText" type="text" maxlength="40" placeholder="Например: Башня 1"></div>
+      <div class="field"><label for="markerColor">Цвет булавки</label><input id="markerColor" type="color" value="#d55353"><div class="pin-preview"><div id="previewPin" class="preview-pin"></div><div class="small">Цвет булавки на карте.</div></div></div>
+      <div class="field"><label for="markerComment">Комментарий</label><textarea id="markerComment" placeholder="Дополнительная заметка"></textarea></div>
+      <div class="editor-actions"><button id="saveMarker" class="btn" type="button">Сохранить</button><button id="deleteMarker" class="btn danger" type="button">Удалить метку</button></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Статус</div>
+      <div class="status-card">
+        <div class="status-line"><span>Территорий</span><strong id="statTerritories">0</strong></div>
+        <div class="status-line"><span>Маркеров</span><strong id="statMarkers">0</strong></div>
+        <div class="status-line"><span>Альянсов</span><strong id="statAlliances">0</strong></div>
+        <div class="status-line"><span>Активный</span><strong id="statActiveAlliance">—</strong></div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+window.LAST_ASYLUM_CONFIG = {
+  supabaseUrl: "https://aixcvtfagcbfeyjmwubu.supabase.co",
+  supabaseAnonKey: "sb_publishable_5cyZhbPUdJPTV0Ogq5HKbA_K70clP3g",
+  mapId: "main",
+  mapTitle: "Last Asylum Alliance Map"
+};
+</script>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const REGIONS = [{"id": "t1", "d": "M 0.0,0.0 L 0.0,7.2 L 0.0,3.6 L 4.3,3.6 L 4.3,96.6 L 93.5,96.6 L 93.5,3.6 L 4.3,3.6 L 3.2,0.9 L 5.4,0.0 Z", "cx": 48.9, "cy": 50.0, "royal": false}, {"id": "t2", "d": "M 98.9,3.6 L 98.9,106.4 L 160.2,106.4 L 160.2,90.3 L 162.4,88.5 L 188.2,88.5 L 188.2,3.6 Z", "cx": 141.8, "cy": 52.6, "royal": false}, {"id": "t3", "d": "M 193.5,3.6 L 193.5,65.3 L 257.0,65.3 L 259.1,67.1 L 259.1,84.1 L 316.1,84.1 L 316.1,3.6 Z", "cx": 258.8, "cy": 39.6, "royal": false}, {"id": "t4", "d": "M 320.4,3.6 L 320.4,84.1 L 389.2,84.1 L 391.4,85.9 L 391.4,103.8 L 435.5,103.8 L 435.5,18.8 L 438.7,16.1 L 464.5,16.1 L 464.5,3.6 Z", "cx": 383.8, "cy": 46.9, "royal": false}, {"id": "t5", "d": "M 469.9,3.6 L 468.8,20.6 L 440.9,21.5 L 440.9,103.8 L 458.1,103.8 L 459.1,107.3 L 526.9,107.3 L 526.9,74.2 L 529.0,72.4 L 554.8,72.4 L 554.8,3.6 Z", "cx": 496.2, "cy": 54.0, "royal": false}, {"id": "t6", "d": "M 560.2,3.6 L 560.2,64.4 L 661.3,64.4 L 662.4,110.0 L 701.1,110.0 L 701.1,3.6 Z", "cx": 639.7, "cy": 43.4, "royal": false}, {"id": "t7", "d": "M 807.5,3.6 L 705.4,3.6 L 705.4,110.0 L 732.3,110.0 L 732.3,61.7 L 734.4,59.9 L 807.5,59.9 Z", "cx": 749.1, "cy": 42.5, "royal": false}, {"id": "t8", "d": "M 811.8,3.6 L 811.8,33.1 L 846.2,33.1 L 848.4,34.9 L 848.4,73.3 L 894.6,73.3 L 893.5,50.1 L 895.7,48.3 L 917.2,48.3 L 917.2,25.0 L 919.4,23.3 L 944.1,23.3 L 944.1,3.6 Z", "cx": 875.4, "cy": 30.2, "royal": false}, {"id": "t9", "d": "M 995.7,3.6 L 948.4,3.6 L 948.4,26.8 L 922.6,27.7 L 922.6,51.0 L 920.4,52.8 L 898.9,52.8 L 898.9,98.4 L 994.6,98.4 Z", "cx": 953.6, "cy": 57.4, "royal": false}, {"id": "t10", "d": "M 843.0,37.6 L 811.8,37.6 L 810.8,64.4 L 737.6,64.4 L 737.6,111.8 L 735.5,114.5 L 722.6,114.5 L 722.6,145.8 L 804.3,145.8 L 806.5,119.8 L 844.1,119.8 Z", "cx": 787.6, "cy": 98.1, "royal": false}, {"id": "t11", "d": "M 532.3,76.9 L 532.3,149.4 L 609.7,148.5 L 612.9,151.2 L 612.9,159.2 L 633.3,159.2 L 634.4,147.6 L 678.5,148.5 L 678.5,114.5 L 659.1,114.5 L 657.0,111.8 L 657.0,68.9 L 560.2,68.9 L 560.2,74.2 L 557.0,76.9 Z", "cx": 601.1, "cy": 112.0, "royal": false}, {"id": "t12", "d": "M 193.5,70.7 L 193.5,91.2 L 191.4,93.0 L 165.6,93.0 L 165.6,164.6 L 191.4,164.6 L 193.5,166.4 L 193.5,187.8 L 204.3,187.8 L 205.4,185.1 L 254.8,185.1 L 254.8,70.7 Z", "cx": 214.4, "cy": 128.2, "royal": false}, {"id": "t13", "d": "M 848.4,77.8 L 848.4,122.5 L 846.2,124.3 L 809.7,124.3 L 808.6,175.3 L 874.2,175.3 L 876.3,177.1 L 876.3,190.5 L 887.1,190.5 L 887.1,151.2 L 889.2,149.4 L 917.2,149.4 L 917.2,102.9 L 895.7,102.9 L 893.5,101.1 L 894.6,77.8 Z", "cx": 864.5, "cy": 133.2, "royal": false}, {"id": "t14", "d": "M 259.1,88.5 L 259.1,163.7 L 358.1,163.7 L 359.1,181.6 L 386.0,180.7 L 386.0,88.5 Z", "cx": 325.0, "cy": 128.4, "royal": false}, {"id": "t15", "d": "M 4.3,101.1 L 4.3,208.4 L 49.5,208.4 L 50.5,164.6 L 160.2,164.6 L 160.2,110.9 L 95.7,110.9 L 93.5,109.1 L 93.5,101.1 Z", "cx": 70.6, "cy": 144.1, "royal": false}, {"id": "t16", "d": "M 922.6,102.9 L 922.6,152.0 L 920.4,153.8 L 892.5,153.8 L 892.5,189.6 L 931.2,189.6 L 933.3,191.4 L 933.3,238.8 L 976.3,238.8 L 976.3,214.7 L 995.7,213.8 L 994.6,102.9 Z", "cx": 953.4, "cy": 166.0, "royal": false}, {"id": "t17", "d": "M 391.4,108.2 L 391.4,184.2 L 388.2,186.0 L 359.1,186.0 L 359.1,233.4 L 480.6,233.4 L 480.6,170.8 L 454.8,169.9 L 454.8,108.2 Z", "cx": 423.1, "cy": 180.7, "royal": false}, {"id": "t18", "d": "M 459.1,112.7 L 459.1,166.4 L 483.9,166.4 L 486.0,168.1 L 486.0,206.6 L 544.1,206.6 L 544.1,186.0 L 546.2,184.2 L 580.6,184.2 L 580.6,153.8 L 530.1,153.8 L 526.9,151.2 L 526.9,112.7 Z", "cx": 512.3, "cy": 159.7, "royal": false}, {"id": "t19", "d": "M 683.9,114.5 L 683.9,152.0 L 680.6,152.9 L 680.6,218.2 L 698.9,219.1 L 698.9,238.8 L 779.6,238.8 L 779.6,177.1 L 781.7,175.3 L 804.3,175.3 L 804.3,150.3 L 719.4,150.3 L 717.2,148.5 L 718.3,114.5 Z", "cx": 732.0, "cy": 183.7, "royal": false}, {"id": "t20", "d": "M 675.3,152.0 L 637.6,152.0 L 636.6,163.7 L 608.6,163.7 L 607.5,153.8 L 586.0,153.8 L 586.0,186.9 L 583.9,188.7 L 549.5,188.7 L 549.5,229.9 L 577.4,229.9 L 579.6,231.6 L 579.6,250.4 L 594.6,250.4 L 596.8,253.1 L 596.8,264.7 L 632.3,264.7 L 632.3,219.1 L 675.3,218.2 Z", "cx": 615.7, "cy": 203.3, "royal": false}, {"id": "t21", "d": "M 53.8,169.0 L 53.8,208.4 L 100.0,208.4 L 102.2,210.2 L 102.2,266.5 L 123.7,266.5 L 123.7,254.0 L 126.9,252.2 L 203.2,252.2 L 204.3,192.3 L 191.4,192.3 L 188.2,189.6 L 188.2,169.0 Z", "cx": 136.2, "cy": 209.1, "royal": false}, {"id": "t22", "d": "M 208.6,189.6 L 208.6,257.6 L 302.2,258.5 L 303.2,238.8 L 353.8,238.8 L 354.8,168.1 L 259.1,168.1 L 258.1,189.6 Z", "cx": 281.9, "cy": 213.0, "royal": false}, {"id": "t23", "d": "M 784.9,180.7 L 784.9,238.8 L 815.1,239.7 L 815.1,267.4 L 875.3,267.4 L 875.3,253.1 L 877.4,251.3 L 917.2,251.3 L 918.3,239.7 L 929.0,238.8 L 929.0,194.1 L 874.2,195.9 L 871.0,193.2 L 871.0,180.7 Z", "cx": 853.8, "cy": 221.1, "royal": false}, {"id": "t24", "d": "M 435.5,264.7 L 435.5,291.6 L 455.9,291.6 L 458.1,293.4 L 458.1,322.0 L 508.6,322.0 L 508.6,307.7 L 512.9,304.1 L 591.4,304.1 L 591.4,255.8 L 575.3,254.0 L 575.3,235.2 L 548.4,235.2 L 545.2,233.4 L 544.1,211.1 L 486.0,211.1 L 486.0,236.1 L 481.7,237.9 L 481.7,263.0 L 479.6,264.7 Z", "cx": 517.5, "cy": 269.8, "royal": false}, {"id": "t25", "d": "M 4.3,212.9 L 4.3,376.5 L 66.7,376.5 L 66.7,296.0 L 96.8,295.2 L 96.8,212.9 Z", "cx": 44.7, "cy": 288.9, "royal": false}, {"id": "t26", "d": "M 995.7,218.2 L 980.6,218.2 L 980.6,241.5 L 978.5,243.3 L 922.6,243.3 L 922.6,301.4 L 947.3,302.3 L 948.4,344.3 L 995.7,343.4 Z", "cx": 964.5, "cy": 285.7, "royal": false}, {"id": "t27", "d": "M 596.8,269.2 L 596.8,304.1 L 632.3,304.1 L 636.6,306.8 L 636.6,318.4 L 736.6,318.4 L 736.6,276.4 L 696.8,276.4 L 694.6,274.6 L 694.6,222.7 L 637.6,222.7 L 637.6,268.3 Z", "cx": 668.2, "cy": 278.8, "royal": false}, {"id": "t28", "d": "M 359.1,237.9 L 359.1,268.3 L 390.3,268.3 L 390.3,252.2 L 395.7,252.2 L 395.7,269.2 L 391.4,270.1 L 391.4,291.6 L 430.1,291.6 L 430.1,262.1 L 432.3,260.3 L 476.3,260.3 L 476.3,237.9 Z", "cx": 413.5, "cy": 257.8, "royal": false}, {"id": "t29", "d": "M 260.2,263.0 L 260.2,311.2 L 303.2,311.2 L 305.4,308.6 L 387.1,308.6 L 387.1,272.8 L 354.8,271.9 L 353.8,243.3 L 307.5,243.3 L 307.5,260.3 L 305.4,262.1 Z", "cx": 321.9, "cy": 282.3, "royal": false}, {"id": "t30", "d": "M 698.9,243.3 L 698.9,271.9 L 739.8,271.9 L 741.9,273.7 L 741.9,332.7 L 808.6,332.7 L 808.6,294.3 L 810.8,292.5 L 825.8,292.5 L 825.8,271.9 L 812.9,271.9 L 810.8,270.1 L 810.8,243.3 Z", "cx": 768.4, "cy": 282.5, "royal": false}, {"id": "t31", "d": "M 102.2,271.0 L 102.2,295.2 L 143.0,295.2 L 145.2,296.9 L 145.2,310.4 L 171.0,310.4 L 173.1,312.1 L 173.1,336.3 L 202.2,337.2 L 202.2,305.9 L 218.3,305.0 L 219.4,290.7 L 254.8,290.7 L 254.8,263.0 L 206.5,263.0 L 203.2,256.7 L 129.0,256.7 L 128.0,271.0 Z", "cx": 179.5, "cy": 286.3, "royal": false}, {"id": "t32", "d": "M 917.2,255.8 L 880.6,255.8 L 880.6,269.2 L 878.5,271.9 L 831.2,271.9 L 831.2,295.2 L 829.0,296.9 L 814.0,296.9 L 814.0,333.6 L 877.4,334.5 L 879.6,338.1 L 878.5,349.7 L 895.7,349.7 L 896.8,332.7 L 943.0,332.7 L 943.0,305.9 L 919.4,305.9 L 917.2,304.1 Z", "cx": 877.4, "cy": 303.9, "royal": false}, {"id": "t33", "d": "M 223.7,295.2 L 223.7,307.7 L 221.5,309.5 L 207.5,309.5 L 206.5,340.8 L 194.6,341.7 L 194.6,377.4 L 233.3,377.4 L 235.5,379.2 L 235.5,388.2 L 254.8,388.2 L 254.8,378.3 L 257.0,376.5 L 303.2,376.5 L 303.2,315.7 L 257.0,315.7 L 254.8,313.9 L 254.8,295.2 Z", "cx": 249.6, "cy": 344.1, "royal": false}, {"id": "t34", "d": "M 452.7,296.0 L 391.4,296.0 L 391.4,312.1 L 386.0,313.9 L 307.5,313.0 L 307.5,376.5 L 358.1,376.5 L 358.1,358.7 L 361.3,356.9 L 452.7,356.9 Z", "cx": 378.8, "cy": 335.3, "royal": false}, {"id": "t35", "d": "M 71.0,299.6 L 71.0,377.4 L 189.2,377.4 L 189.2,340.8 L 169.9,340.8 L 167.7,339.0 L 167.7,314.8 L 141.9,314.8 L 140.9,299.6 Z", "cx": 123.8, "cy": 342.3, "royal": false}, {"id": "t36", "d": "M 458.1,326.5 L 458.1,377.4 L 505.4,352.4 L 564.5,384.6 L 567.7,388.2 L 567.7,403.4 L 605.4,403.4 L 607.5,405.2 L 607.5,418.6 L 647.3,418.6 L 647.3,323.8 L 634.4,323.8 L 631.2,321.1 L 631.2,309.5 L 514.0,309.5 L 514.0,324.7 L 511.8,326.5 Z", "cx": 571.8, "cy": 354.2, "royal": false}, {"id": "t37", "d": "M 652.7,323.8 L 652.7,401.6 L 781.7,401.6 L 782.8,386.4 L 808.6,385.5 L 808.6,338.1 L 739.8,338.1 L 736.6,336.3 L 736.6,323.8 Z", "cx": 724.2, "cy": 364.5, "royal": false}, {"id": "t38", "d": "M 900.0,337.2 L 900.0,420.4 L 945.2,420.4 L 947.3,422.2 L 947.3,440.9 L 995.7,440.9 L 994.6,348.8 L 944.1,348.8 L 943.0,337.2 Z", "cx": 948.8, "cy": 387.8, "royal": false}, {"id": "t39", "d": "M 787.1,414.1 L 848.4,414.1 L 848.4,395.3 L 850.5,393.5 L 894.6,393.5 L 895.7,354.2 L 875.3,354.2 L 874.2,339.0 L 814.0,339.0 L 814.0,389.1 L 811.8,390.9 L 787.1,390.9 Z", "cx": 843.8, "cy": 376.8, "royal": false}, {"id": "royal", "d": "M 503.2,358.7 L 448.4,390.0 L 448.4,452.6 L 505.4,483.0 L 561.3,451.7 L 561.3,390.0 Z", "cx": 504.9, "cy": 421.0, "royal": true}, {"id": "t41", "d": "M 362.4,362.2 L 362.4,395.3 L 388.2,395.3 L 391.4,398.0 L 391.4,476.7 L 407.5,476.7 L 409.7,478.5 L 409.7,514.3 L 449.5,514.3 L 449.5,485.7 L 452.7,483.0 L 492.5,483.0 L 441.9,456.1 L 441.9,387.3 L 452.7,381.0 L 452.7,362.2 Z", "cx": 418.8, "cy": 430.6, "royal": false}, {"id": "t42", "d": "M 4.3,381.0 L 4.3,470.5 L 96.8,470.5 L 96.8,447.2 L 98.9,445.4 L 119.4,445.4 L 118.3,381.9 Z", "cx": 59.1, "cy": 424.1, "royal": false}, {"id": "t43", "d": "M 123.7,381.9 L 123.7,449.0 L 102.2,449.9 L 102.2,470.5 L 197.8,470.5 L 197.8,427.5 L 240.9,426.6 L 240.9,392.6 L 230.1,391.7 L 230.1,381.9 Z", "cx": 170.3, "cy": 423.6, "royal": false}, {"id": "t44", "d": "M 246.2,392.6 L 245.2,426.6 L 282.8,426.6 L 283.9,442.7 L 338.7,442.7 L 339.8,432.9 L 386.0,432.9 L 386.0,400.7 L 359.1,399.8 L 358.1,381.0 L 260.2,381.0 L 260.2,390.9 L 258.1,392.6 Z", "cx": 314.6, "cy": 410.4, "royal": false}, {"id": "t45", "d": "M 804.3,418.6 L 804.3,474.9 L 941.9,474.9 L 943.0,424.8 L 896.8,424.8 L 894.6,421.3 L 894.6,398.0 L 853.8,398.0 L 853.8,416.8 L 851.6,418.6 Z", "cx": 871.7, "cy": 443.7, "royal": false}, {"id": "t46", "d": "M 623.7,423.0 L 623.7,512.5 L 639.8,512.5 L 644.1,515.2 L 644.1,540.2 L 691.4,540.2 L 692.5,486.6 L 800.0,486.6 L 800.0,418.6 L 783.9,418.6 L 781.7,416.8 L 781.7,406.1 L 652.7,405.2 L 652.7,419.5 L 649.5,423.0 Z", "cx": 703.4, "cy": 460.0, "royal": false}, {"id": "t47", "d": "M 567.7,408.7 L 567.7,453.5 L 564.5,457.9 L 534.4,473.1 L 535.5,485.7 L 533.3,487.4 L 508.6,487.4 L 505.4,489.2 L 500.0,487.4 L 476.3,487.4 L 476.3,552.7 L 540.9,552.7 L 544.1,554.5 L 544.1,569.7 L 638.7,569.7 L 638.7,517.9 L 621.5,517.9 L 618.3,516.1 L 618.3,423.0 L 603.2,422.2 L 602.2,407.8 Z", "cx": 566.2, "cy": 506.0, "royal": false}, {"id": "t48", "d": "M 202.2,431.1 L 202.2,541.1 L 254.8,540.2 L 254.8,507.1 L 263.4,506.2 L 263.4,462.4 L 279.6,461.5 L 279.6,431.1 Z", "cx": 234.6, "cy": 481.4, "royal": false}, {"id": "t49", "d": "M 386.0,437.4 L 344.1,437.4 L 341.9,447.2 L 283.9,447.2 L 283.9,465.1 L 268.8,466.0 L 268.8,494.6 L 314.0,494.6 L 316.1,496.4 L 316.1,525.9 L 364.5,525.9 L 364.5,486.6 L 366.7,484.8 L 375.3,484.8 L 377.4,476.7 L 386.0,476.7 Z", "cx": 332.4, "cy": 477.8, "royal": false}, {"id": "t50", "d": "M 994.6,445.4 L 947.3,445.4 L 947.3,477.6 L 945.2,479.4 L 912.9,479.4 L 912.9,561.7 L 972.0,561.7 L 972.0,546.5 L 974.2,544.7 L 994.6,544.7 Z", "cx": 955.9, "cy": 507.0, "royal": false}, {"id": "t51", "d": "M 79.6,474.9 L 4.3,474.9 L 4.3,592.1 L 35.5,592.1 L 36.6,542.9 L 79.6,542.0 Z", "cx": 36.8, "cy": 523.1, "royal": false}, {"id": "t52", "d": "M 83.9,474.9 L 83.9,542.0 L 150.5,542.0 L 150.5,521.4 L 152.7,519.6 L 197.8,519.6 L 197.8,474.9 Z", "cx": 136.2, "cy": 504.9, "royal": false}, {"id": "t53", "d": "M 804.3,479.4 L 805.4,555.4 L 821.5,555.4 L 822.6,562.6 L 907.5,561.7 L 907.5,479.4 Z", "cx": 857.1, "cy": 520.1, "royal": false}, {"id": "t54", "d": "M 380.6,481.2 L 380.6,487.4 L 378.5,489.2 L 369.9,489.2 L 369.9,528.6 L 367.7,530.4 L 338.7,530.4 L 338.7,564.4 L 361.3,565.3 L 362.4,584.9 L 411.8,584.9 L 414.0,577.8 L 449.5,577.8 L 449.5,518.8 L 407.5,518.8 L 404.3,509.8 L 404.3,481.2 Z", "cx": 396.6, "cy": 542.0, "royal": false}, {"id": "t55", "d": "M 454.8,487.4 L 453.8,577.8 L 455.9,580.5 L 455.9,617.1 L 531.2,617.1 L 531.2,579.6 L 539.8,578.7 L 539.8,558.1 L 473.1,558.1 L 471.0,556.3 L 471.0,487.4 Z", "cx": 487.9, "cy": 572.8, "royal": false}, {"id": "t56", "d": "M 644.1,583.1 L 653.8,583.1 L 654.8,574.2 L 706.5,574.2 L 706.5,557.2 L 708.6,555.4 L 800.0,555.4 L 800.0,491.0 L 696.8,491.0 L 696.8,542.9 L 694.6,544.7 L 644.1,544.7 Z", "cx": 731.5, "cy": 531.8, "royal": false}, {"id": "t57", "d": "M 310.8,499.1 L 268.8,499.1 L 268.8,508.0 L 266.7,509.8 L 259.1,509.8 L 259.1,542.9 L 257.0,544.7 L 234.4,544.7 L 234.4,591.2 L 222.6,592.1 L 222.6,611.8 L 271.0,611.8 L 271.0,586.7 L 273.1,584.9 L 294.6,584.9 L 294.6,567.0 L 296.8,564.4 L 333.3,564.4 L 333.3,530.4 L 312.9,530.4 L 310.8,528.6 Z", "cx": 276.6, "cy": 554.9, "royal": false}, {"id": "t58", "d": "M 229.0,546.5 L 200.0,546.5 L 197.8,544.7 L 197.8,524.1 L 155.9,524.1 L 155.9,544.7 L 153.8,546.5 L 40.9,547.4 L 39.8,612.7 L 112.9,612.7 L 112.9,601.0 L 115.1,599.2 L 218.3,599.2 L 218.3,588.5 L 230.1,587.6 Z", "cx": 133.0, "cy": 572.5, "royal": false}, {"id": "t59", "d": "M 994.6,549.2 L 977.4,549.2 L 977.4,564.4 L 975.3,566.2 L 926.9,566.2 L 926.9,618.9 L 915.1,619.8 L 915.1,646.6 L 949.5,646.6 L 951.6,648.4 L 951.6,658.3 L 994.6,658.3 Z", "cx": 961.0, "cy": 609.0, "royal": false}, {"id": "t60", "d": "M 659.1,578.7 L 659.1,610.0 L 818.3,608.2 L 818.3,559.9 L 711.8,559.9 L 711.8,576.9 L 708.6,578.7 Z", "cx": 745.6, "cy": 586.9, "royal": false}, {"id": "t61", "d": "M 822.6,566.2 L 822.6,615.3 L 922.6,615.3 L 922.6,566.2 Z", "cx": 872.7, "cy": 591.2, "royal": false}, {"id": "t62", "d": "M 300.0,568.8 L 300.0,588.5 L 296.8,590.3 L 276.3,590.3 L 276.3,626.1 L 307.5,626.1 L 309.7,627.9 L 309.7,672.6 L 323.7,672.6 L 325.8,674.4 L 325.8,694.1 L 350.5,694.1 L 350.5,672.6 L 352.7,670.8 L 377.4,670.8 L 377.4,609.1 L 357.0,608.2 L 357.0,568.8 Z", "cx": 332.2, "cy": 624.9, "royal": false}, {"id": "t63", "d": "M 536.6,583.1 L 536.6,628.8 L 597.8,627.9 L 597.8,611.8 L 600.0,610.0 L 653.8,610.0 L 653.8,587.6 L 640.9,587.6 L 638.7,585.8 L 638.7,574.2 L 544.1,574.2 L 544.1,582.3 Z", "cx": 588.3, "cy": 598.7, "royal": false}, {"id": "t64", "d": "M 449.5,582.3 L 417.2,582.3 L 415.1,589.4 L 362.4,589.4 L 361.3,604.6 L 380.6,604.6 L 382.8,607.3 L 382.8,670.8 L 450.5,670.8 Z", "cx": 415.0, "cy": 626.4, "royal": false}, {"id": "t65", "d": "M 4.3,596.6 L 4.3,728.9 L 91.4,728.9 L 91.4,663.6 L 93.5,661.0 L 112.9,661.0 L 112.9,617.1 L 37.6,617.1 L 35.5,615.3 L 35.5,596.6 Z", "cx": 51.0, "cy": 666.4, "royal": false}, {"id": "t66", "d": "M 117.2,603.7 L 117.2,664.5 L 96.8,665.4 L 96.8,711.9 L 218.3,711.9 L 218.3,603.7 Z", "cx": 162.8, "cy": 660.4, "royal": false}, {"id": "t67", "d": "M 603.2,614.5 L 603.2,630.5 L 601.1,632.3 L 581.7,632.3 L 581.7,652.9 L 596.8,653.8 L 596.8,701.2 L 674.2,701.2 L 674.2,645.8 L 676.3,644.0 L 703.2,644.0 L 703.2,614.5 Z", "cx": 640.4, "cy": 654.5, "royal": false}, {"id": "t68", "d": "M 679.6,648.4 L 679.6,681.5 L 817.2,681.5 L 817.2,613.6 L 708.6,613.6 L 708.6,647.5 Z", "cx": 755.0, "cy": 649.6, "royal": false}, {"id": "t69", "d": "M 222.6,616.2 L 222.6,703.9 L 267.7,703.9 L 269.9,705.7 L 269.9,716.4 L 320.4,716.4 L 320.4,677.1 L 305.4,676.2 L 305.4,630.5 L 274.2,631.4 L 271.0,629.7 L 271.0,616.2 Z", "cx": 267.7, "cy": 668.3, "royal": false}, {"id": "t70", "d": "M 822.6,619.8 L 822.6,695.8 L 888.2,695.8 L 888.2,680.6 L 890.3,678.8 L 910.8,678.8 L 910.8,619.8 Z", "cx": 864.7, "cy": 656.1, "royal": false}, {"id": "t71", "d": "M 455.9,621.6 L 455.9,670.8 L 534.4,670.8 L 536.6,672.6 L 536.6,695.8 L 555.9,695.8 L 558.1,710.2 L 578.5,710.2 L 579.6,701.2 L 592.5,701.2 L 592.5,657.4 L 579.6,657.4 L 576.3,655.6 L 576.3,633.2 L 533.3,633.2 L 531.2,631.4 L 531.2,621.6 Z", "cx": 528.3, "cy": 658.4, "royal": false}, {"id": "t72", "d": "M 915.1,651.1 L 915.1,682.4 L 893.5,683.3 L 893.5,703.9 L 912.9,703.9 L 915.1,705.7 L 915.1,721.8 L 995.7,721.8 L 994.6,662.7 L 948.4,662.7 L 946.2,661.0 L 946.2,651.1 Z", "cx": 949.0, "cy": 690.0, "royal": false}, {"id": "t73", "d": "M 325.8,698.5 L 326.9,734.3 L 338.7,735.2 L 339.8,745.9 L 412.9,745.9 L 414.0,762.9 L 432.3,762.9 L 432.3,750.4 L 434.4,748.6 L 458.1,748.6 L 458.1,727.1 L 444.1,727.1 L 441.9,725.4 L 441.9,675.3 L 355.9,675.3 L 355.9,695.8 L 353.8,698.5 Z", "cx": 393.8, "cy": 715.3, "royal": false}, {"id": "t74", "d": "M 447.3,675.3 L 447.3,722.7 L 461.3,722.7 L 463.4,724.5 L 463.4,752.2 L 436.6,753.1 L 436.6,762.9 L 517.2,763.8 L 517.2,727.1 L 552.7,726.2 L 552.7,700.3 L 532.3,699.4 L 532.3,676.2 Z", "cx": 492.7, "cy": 716.5, "royal": false}, {"id": "t75", "d": "M 655.9,705.7 L 655.9,716.4 L 677.4,717.3 L 677.4,760.2 L 739.8,760.2 L 739.8,735.2 L 790.3,734.3 L 791.4,713.7 L 818.3,713.7 L 817.2,686.0 L 679.6,686.0 L 679.6,704.8 Z", "cx": 734.3, "cy": 716.8, "royal": false}, {"id": "t76", "d": "M 744.1,738.8 L 744.1,760.2 L 769.9,760.2 L 772.0,762.0 L 772.0,778.1 L 818.3,778.1 L 818.3,761.1 L 820.4,759.3 L 909.7,759.3 L 909.7,708.4 L 890.3,708.4 L 888.2,706.6 L 888.2,700.3 L 822.6,700.3 L 821.5,718.2 L 794.6,718.2 L 793.5,738.8 Z", "cx": 836.3, "cy": 738.7, "royal": false}, {"id": "t77", "d": "M 522.6,730.7 L 522.6,762.9 L 672.0,762.9 L 672.0,720.9 L 652.7,720.9 L 650.5,719.1 L 650.5,705.7 L 582.8,705.7 L 581.7,714.6 L 558.1,714.6 L 558.1,728.0 L 555.9,730.7 Z", "cx": 601.9, "cy": 738.2, "royal": false}, {"id": "t78", "d": "M 238.7,708.4 L 222.6,708.4 L 222.6,714.6 L 220.4,716.4 L 96.8,716.4 L 97.8,774.5 L 238.7,772.8 Z", "cx": 169.1, "cy": 744.3, "royal": false}, {"id": "t79", "d": "M 244.1,708.4 L 244.1,772.8 L 271.0,772.8 L 272.0,789.8 L 314.0,789.8 L 315.1,763.8 L 334.4,762.9 L 334.4,738.8 L 323.7,738.8 L 321.5,737.0 L 321.5,720.9 L 266.7,720.9 L 264.5,719.1 L 264.5,708.4 Z", "cx": 285.2, "cy": 750.0, "royal": false}, {"id": "t80", "d": "M 915.1,726.2 L 915.1,807.6 L 935.5,808.5 L 935.5,826.4 L 994.6,826.4 L 995.7,726.2 Z", "cx": 956.4, "cy": 774.4, "royal": false}, {"id": "t81", "d": "M 172.0,778.1 L 94.6,779.0 L 92.5,777.2 L 91.4,732.5 L 4.3,733.4 L 4.3,821.1 L 172.0,821.1 Z", "cx": 74.8, "cy": 784.2, "royal": false}, {"id": "t82", "d": "M 319.4,767.4 L 319.4,821.1 L 431.2,821.1 L 431.2,767.4 L 410.8,767.4 L 409.7,750.4 L 339.8,750.4 L 339.8,765.6 L 337.6,767.4 Z", "cx": 375.2, "cy": 788.3, "royal": false}, {"id": "t83", "d": "M 660.2,767.4 L 660.2,826.4 L 787.1,826.4 L 787.1,782.6 L 767.7,781.7 L 766.7,764.7 L 677.4,764.7 L 676.3,767.4 Z", "cx": 721.5, "cy": 796.9, "royal": false}, {"id": "t84", "d": "M 792.5,782.6 L 792.5,826.4 L 930.1,826.4 L 930.1,812.1 L 911.8,812.1 L 909.7,810.3 L 909.7,763.8 L 823.7,763.8 L 823.7,779.9 L 821.5,782.6 Z", "cx": 857.4, "cy": 798.1, "royal": false}, {"id": "t85", "d": "M 436.6,767.4 L 436.6,821.1 L 547.3,821.1 L 547.3,784.4 L 518.3,783.5 L 517.2,767.4 Z", "cx": 488.5, "cy": 795.9, "royal": false}, {"id": "t86", "d": "M 522.6,767.4 L 522.6,779.0 L 549.5,779.0 L 552.7,780.8 L 552.7,821.1 L 654.8,822.0 L 654.8,767.4 Z", "cx": 599.6, "cy": 792.8, "royal": false}, {"id": "t87", "d": "M 177.4,777.2 L 177.4,821.1 L 314.0,821.1 L 314.0,794.2 L 268.8,794.2 L 266.7,792.4 L 266.7,777.2 Z", "cx": 239.4, "cy": 801.2, "royal": false}];
+const REGION_LEVELS = {"t1": 1, "t2": 1, "t3": 1, "t4": 2, "t5": 1, "t6": 1, "t7": 1, "t8": 1, "t9": 1, "t10": 2, "t11": 2, "t12": 2, "t13": 2, "t14": 1, "t15": 1, "t16": 1, "t17": 2, "t18": 2, "t19": 2, "t20": 3, "t21": 1, "t22": 1, "t23": 1, "t24": 4, "t25": 1, "t26": 1, "t27": 5, "t28": 3, "t29": 3, "t30": 3, "t31": 2, "t32": 2, "t33": 3, "t34": 5, "t35": 1, "t36": 6, "t37": 4, "t38": 1, "t39": 3, "t41": 6, "t42": 1, "t43": 2, "t44": 4, "t45": 3, "t46": 5, "t47": 6, "t48": 3, "t49": 4, "t50": 1, "t51": 1, "t52": 1, "t53": 2, "t54": 5, "t55": 4, "t56": 4, "t57": 3, "t58": 2, "t59": 1, "t60": 3, "t61": 2, "t62": 3, "t63": 4, "t64": 3, "t65": 1, "t66": 1, "t67": 2, "t68": 2, "t69": 2, "t70": 1, "t71": 3, "t72": 1, "t73": 2, "t74": 1, "t75": 2, "t76": 2, "t77": 1, "t78": 2, "t79": 1, "t80": 1, "t81": 1, "t82": 1, "t83": 1, "t84": 1, "t85": 1, "t86": 1, "t87": 1};
+
+const $ = (id) => document.getElementById(id);
+const ns = 'http://www.w3.org/2000/svg';
+const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
+const cfg = window.LAST_ASYLUM_CONFIG || {};
+const MAP_ID = cfg.mapId || 'main';
+const configured = /^https:\/\/.+\.supabase\.co$/i.test(cfg.supabaseUrl || '') && !!cfg.supabaseAnonKey && !String(cfg.supabaseAnonKey).includes('PASTE_');
+const EDITOR_API_URL = "https://aixcvtfagcbfeyjmwubu.supabase.co/functions/v1/last-asylum-map";
+
+let supabase = null;
+let user = null;
+let editorCode = sessionStorage.getItem('la_editor_code') || '';
+let isEditor = false;
+let tool = 'pan';
+let drag = null;
+let selectedAllianceId = null;
+let selectedMarkerId = null;
+let realtimeChannel = null;
+let refreshTimer = null;
+let data = { alliances: [], territories: {}, markers: [] };
+let view = {scale:1,x:0,y:0};
+
+const viewport = $('viewport');
+const mover = $('mover');
+const zoneLayer = $('zoneLayer');
+const tagLayer = $('tagLayer');
+const levelLayer = $('levelLayer');
+const markerLayer = $('markerLayer');
+const royalLayer = $('royalLayer');
+
+$('mapTitle').textContent = cfg.mapTitle || 'Last Asylum Alliance Map';
+
+function safeText(s) {
+  return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+function rgba(hex,a) {
+  const h = String(hex).replace('#','');
+  const full = h.length===3 ? h.split('').map(c=>c+c).join('') : h.padEnd(6,'0');
+  const v = parseInt(full,16);
+  return `rgba(${(v>>16)&255},${(v>>8)&255},${v&255},${a})`;
+}
+function activeAlliance() {
+  return data.alliances.find(a => a.id === selectedAllianceId) || null;
+}
+function markerById(id) {
+  return data.markers.find(m => m.id === id) || null;
+}
+function toast(message, ms=2600) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.remove('hidden');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.add('hidden'), ms);
+}
+function setOnline(mode, text) {
+  const el = $('onlineStatus');
+  el.classList.remove('ok','warn','bad');
+  el.classList.add(mode);
+  $('onlineText').textContent = text;
+}
+function requireEditor() {
+  if (!isEditor) {
+    toast('Для изменения карты войдите как редактор.');
+    return false;
+  }
+  return true;
+}
+
+function buildZones() {
+  zoneLayer.innerHTML = '';
+  royalLayer.innerHTML = '';
+  for (const r of REGIONS) {
+    const p = document.createElementNS(ns,'path');
+    p.setAttribute('d',r.d);
+    p.setAttribute('class','zone-fill' + (r.royal ? ' royal' : ''));
+    p.dataset.id = r.id;
+    zoneLayer.appendChild(p);
+  }
+  const royal = REGIONS.find(r => r.royal);
+  if (royal) {
+    const t1 = document.createElementNS(ns,'text');
+    t1.setAttribute('x',royal.cx); t1.setAttribute('y',royal.cy-10); t1.setAttribute('class','royal-label'); t1.textContent='Royal';
+    const t2 = document.createElementNS(ns,'text');
+    t2.setAttribute('x',royal.cx); t2.setAttribute('y',royal.cy+18); t2.setAttribute('class','royal-sub'); t2.textContent='City';
+    royalLayer.append(t1,t2);
+  }
+}
+
+function renderAlliances() {
+  const list = $('allianceList');
+  list.innerHTML = '';
+  for (const a of data.alliances) {
+    const count = Object.values(data.territories).filter(v => v === a.id).length;
+    const row = document.createElement('div');
+    row.className = 'alliance-row' + (selectedAllianceId === a.id ? ' active' : '');
+    row.innerHTML = `<span class="swatch" style="background:${a.color}"></span><span class="alliance-name">${safeText(a.tag)}</span><span class="count">${count}</span>`;
+    row.addEventListener('click', () => { selectedAllianceId = a.id; render(); });
+    list.appendChild(row);
+  }
+  $('statAlliances').textContent = String(data.alliances.length);
+  $('statActiveAlliance').textContent = activeAlliance()?.tag || '—';
+}
+
+function renderZones() {
+  tagLayer.innerHTML = '';
+  levelLayer.innerHTML = '';
+  for (const r of REGIONS) {
+    const path = zoneLayer.querySelector(`[data-id="${r.id}"]`);
+    const a = data.alliances.find(x => x.id === data.territories[r.id]) || null;
+    path.style.fill = a ? rgba(a.color,.72) : (r.royal ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.10)');
+    const lvl = REGION_LEVELS[r.id];
+    if (lvl) {
+      const level = document.createElementNS(ns,'text');
+      level.setAttribute('x',r.cx); level.setAttribute('y',a ? r.cy+14 : r.cy);
+      level.setAttribute('class','level-label'); level.textContent=`Lv. ${lvl}`; levelLayer.appendChild(level);
+    }
+    if (a) {
+      const text = document.createElementNS(ns,'text');
+      text.setAttribute('x',r.cx); text.setAttribute('y',lvl ? r.cy-10 : r.cy);
+      text.setAttribute('class','alliance-tag');
+      let size=18; if(a.tag.length>=6)size=15; if(a.tag.length>=9)size=13;
+      text.setAttribute('font-size',size); text.textContent=a.tag; tagLayer.appendChild(text);
+    }
+  }
+  $('statTerritories').textContent = String(REGIONS.length);
+}
+
+function renderMarkers() {
+  markerLayer.innerHTML='';
+  for (const m of data.markers) {
+    const g=document.createElementNS(ns,'g');
+    g.setAttribute('class','marker'+(selectedMarkerId===m.id?' selected':''));
+    g.dataset.id=m.id;
+    g.setAttribute('transform',`translate(${Number(m.x)} ${Number(m.y)})`);
+    g.innerHTML=`<path d="M0,-18 C9,-18 16,-11 16,-3 C16,5 10,9 0,24 C-10,9 -16,5 -16,-3 C-16,-11 -9,-18 0,-18Z" fill="${m.color || '#d55353'}" stroke="#23321f" stroke-width="2.5"></path><circle cx="0" cy="-3" r="5.2" fill="#fff"></circle><text x="22" y="0">${safeText(m.text || 'Метка')}</text>`;
+    g.addEventListener('click',(e)=>{e.stopPropagation(); if(tool==='erase'){deleteMarker(m.id);return;} selectMarker(m.id);});
+    markerLayer.appendChild(g);
+  }
+  $('statMarkers').textContent=String(data.markers.length);
+}
+
+function renderMarkerEditor() {
+  const m=markerById(selectedMarkerId);
+  if(!m){ $('markerEmpty').classList.remove('hidden'); $('markerEditor').classList.add('hidden'); return; }
+  $('markerEmpty').classList.add('hidden'); $('markerEditor').classList.remove('hidden');
+  $('markerText').value=m.text||''; $('markerColor').value=m.color||'#d55353'; $('markerComment').value=m.comment||'';
+  $('previewPin').style.background=m.color||'#d55353';
+}
+
+function setEditingUi() {
+  $('addAlliance').disabled=!isEditor || !configured;
+  $('allianceName').disabled=!isEditor || !configured;
+  $('allianceColor').disabled=!isEditor || !configured;
+  $('deleteAlliance').disabled=!isEditor || !configured;
+  document.querySelector('[data-tool="paint"]').disabled=!isEditor || !configured;
+  document.querySelector('[data-tool="marker"]').disabled=!isEditor || !configured;
+  document.querySelector('[data-tool="erase"]').disabled=!isEditor || !configured;
+  $('markerText').disabled=!isEditor; $('markerColor').disabled=!isEditor; $('markerComment').disabled=!isEditor;
+  $('saveMarker').disabled=!isEditor; $('deleteMarker').disabled=!isEditor;
+  if(!isEditor && tool!=='pan') tool='pan';
+  document.querySelectorAll('.tool').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===tool));
+  $('accessSubtitle').textContent = isEditor ? 'Режим редактирования' : 'Публичный просмотр';
+}
+
+function render() {
+  renderAlliances(); renderZones(); renderMarkers(); renderMarkerEditor(); setEditingUi(); applyView();
+}
+
+function applyView() {
+  mover.style.transform=`translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px)) scale(${view.scale})`;
+}
+
+async function refreshAll() {
+  if(!configured || !supabase) return;
+  try {
+    const [aRes,tRes,mRes]=await Promise.all([
+      supabase.from('alliances').select('id,tag,color').eq('map_id',MAP_ID).order('created_at'),
+      supabase.from('territories').select('territory_id,alliance_id').eq('map_id',MAP_ID),
+      supabase.from('markers').select('id,x,y,text,comment,color,created_at').eq('map_id',MAP_ID).order('created_at')
+    ]);
+    for (const r of [aRes,tRes,mRes]) if(r.error) throw r.error;
+    data.alliances=aRes.data||[];
+    data.territories=Object.fromEntries((tRes.data||[]).map(r=>[r.territory_id,r.alliance_id]));
+    data.markers=mRes.data||[];
+    if(selectedAllianceId && !data.alliances.some(a=>a.id===selectedAllianceId)) selectedAllianceId=null;
+    if(!selectedAllianceId && data.alliances[0]) selectedAllianceId=data.alliances[0].id;
+    if(selectedMarkerId && !data.markers.some(m=>m.id===selectedMarkerId)) selectedMarkerId=null;
+    render();
+    setOnline('ok','Онлайн');
+  } catch(err) {
+    console.error(err);
+    setOnline('bad','Ошибка связи');
+    toast('Не удалось загрузить общую карту.');
+  }
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(refreshAll,120);
+}
+
+async function subscribeRealtime() {
+  if(!supabase) return;
+  if(realtimeChannel) await supabase.removeChannel(realtimeChannel);
+  realtimeChannel=supabase.channel(`map-${MAP_ID}`)
+    .on('postgres_changes',{event:'*',schema:'public',table:'alliances',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'territories',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'markers',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED') setOnline('ok','Онлайн');
+      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') setOnline('bad','Realtime ошибка');
+    });
+}
+
+async function apiAction(action, payload={}, codeOverride=null) {
+  const code = codeOverride ?? editorCode;
+  const response = await fetch(EDITOR_API_URL, {
+    method: 'POST',
+    headers: {'content-type':'application/json','x-editor-code':code},
+    body: JSON.stringify({action,payload})
+  });
+  const body = await response.json().catch(()=>({}));
+  if (!response.ok || body.error) throw new Error(body.error || 'Ошибка редактора');
+  return body;
+}
+
+async function addAlliance() {
+  if(!requireEditor()) return;
+  const tag=$('allianceName').value.trim().toUpperCase();
+  if(!tag){$('allianceMessage').textContent='Введите тег альянса.';return;}
+  const {error}=await supabase.from('alliances').insert({map_id:MAP_ID,tag,color:$('allianceColor').value,created_by:user?.id||null});
+  if(error){$('allianceMessage').textContent=error.code==='23505'?'Такой альянс уже есть.':`Ошибка: ${error.message}`;return;}
+  $('allianceName').value=''; $('allianceMessage').textContent=`Альянс ${tag} добавлен.`; await refreshAll();
+}
+
+async function deleteActiveAlliance() {
+  if(!requireEditor()) return;
+  const a=activeAlliance(); if(!a){toast('Выберите альянс.');return;}
+  if(!confirm(`Удалить альянс ${a.tag} и очистить его территории?`)) return;
+  const {error}=await supabase.from('alliances').delete().eq('id',a.id).eq('map_id',MAP_ID);
+  if(error){toast(`Ошибка: ${error.message}`);return;}
+  selectedAllianceId=null; await refreshAll();
+}
+
+async function paintRegion(id) {
+  if(!requireEditor())return;
+  const a=activeAlliance(); if(!a){toast('Сначала выберите альянс.');return;}
+  const {error}=await supabase.from('territories').upsert({map_id:MAP_ID,territory_id:id,alliance_id:a.id,updated_at:new Date().toISOString(),updated_by:user?.id||null},{onConflict:'map_id,territory_id'});
+  if(error)toast(`Ошибка: ${error.message}`);
+}
+
+async function clearRegion(id) {
+  if(!requireEditor())return;
+  const {error}=await supabase.from('territories').delete().eq('map_id',MAP_ID).eq('territory_id',id);
+  if(error)toast(`Ошибка: ${error.message}`);
+}
+
+async function addMarker(x,y) {
+  if(!requireEditor())return;
+  const a=activeAlliance();
+  const payload={map_id:MAP_ID,x:Math.round(x),y:Math.round(y),text:a?.tag||'Метка',comment:'',color:a?.color||'#d55353',created_by:user?.id||null};
+  const {data:rows,error}=await supabase.from('markers').insert(payload).select('id,x,y,text,comment,color,created_at').single();
+  if(error){toast(`Ошибка: ${error.message}`);return;}
+  selectedMarkerId=rows.id; await refreshAll(); selectedMarkerId=rows.id; render();
+}
+
+function selectMarker(id){ selectedMarkerId=id; render(); }
+
+async function saveSelectedMarker() {
+  if(!requireEditor())return;
+  const m=markerById(selectedMarkerId); if(!m)return;
+  const payload={text:$('markerText').value.trim()||'Метка',color:$('markerColor').value,comment:$('markerComment').value,updated_at:new Date().toISOString()};
+  const {error}=await supabase.from('markers').update(payload).eq('id',m.id).eq('map_id',MAP_ID);
+  if(error)toast(`Ошибка: ${error.message}`); else toast('Метка сохранена.');
+}
+
+async function deleteMarker(id) {
+  if(!requireEditor())return;
+  const {error}=await supabase.from('markers').delete().eq('id',id).eq('map_id',MAP_ID);
+  if(error){toast(`Ошибка: ${error.message}`);return;}
+  if(selectedMarkerId===id)selectedMarkerId=null; await refreshAll();
+}
+
+function screenToMap(clientX,clientY) {
+  const rect=mover.getBoundingClientRect();
+  return {x:clamp(((clientX-rect.left)/rect.width)*1000,0,1000),y:clamp(((clientY-rect.top)/rect.height)*830,0,830)};
+}
+
+function pointerDown(e) {
+  const region=e.target.closest('.zone-fill');
+  const marker=e.target.closest('.marker');
+  if(marker){ if(tool==='erase'){deleteMarker(marker.dataset.id);return;} selectMarker(marker.dataset.id);return; }
+  if(tool==='paint'&&region){paintRegion(region.dataset.id);return;}
+  if(tool==='erase'&&region){clearRegion(region.dataset.id);return;}
+  if(tool==='marker'){const p=screenToMap(e.clientX,e.clientY);addMarker(p.x,p.y);return;}
+  if(tool==='pan'||e.button===1||e.button===2){drag={x:e.clientX,y:e.clientY,viewX:view.x,viewY:view.y};e.preventDefault();}
+}
+function pointerMove(e) {
+  const p=screenToMap(e.clientX,e.clientY); $('coord').textContent=`X: ${Math.round(p.x)} · Y: ${Math.round(p.y)}`;
+  if(!drag)return; view.x=drag.viewX+(e.clientX-drag.x); view.y=drag.viewY+(e.clientY-drag.y); applyView();
+}
+function pointerUp(){drag=null;}
+function zoom(factor,anchorX=viewport.clientWidth/2,anchorY=viewport.clientHeight/2) {
+  const old=view.scale,next=clamp(old*factor,.65,4); if(Math.abs(next-old)<.0001)return;
+  const cx=anchorX-viewport.clientWidth/2,cy=anchorY-viewport.clientHeight/2;
+  view.x=(view.x-cx)*(next/old)+cx; view.y=(view.y-cy)*(next/old)+cy; view.scale=next; applyView();
+}
+
+async function login() {
+  const code=$('editorCode').value.trim();
+  if(!code){$('authMessage').textContent='Введите код редактора.';return;}
+  $('authMessage').textContent='Проверка…';
+  try {
+    await apiAction('verify',{},code);
+    editorCode=code;
+    sessionStorage.setItem('la_editor_code',code);
+    isEditor=true;
+    $('editorCode').value='';
+    $('authMessage').textContent='Режим редактора включён.';
+    updateAuthUi(); render();
+  } catch(error) {
+    isEditor=false;
+    $('authMessage').textContent='Неверный код редактора.';
+  }
+}
+async function logout(){
+  editorCode='';
+  sessionStorage.removeItem('la_editor_code');
+  isEditor=false;
+  selectedMarkerId=null;
+  updateAuthUi();render();
+}
+
+function bind() {
+  $('addAlliance').addEventListener('click',addAlliance);
+  $('allianceName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addAlliance();}});
+  $('deleteAlliance').addEventListener('click',deleteActiveAlliance);
+  $('zoomIn').addEventListener('click',()=>zoom(1.12)); $('zoomOut').addEventListener('click',()=>zoom(1/1.12)); $('resetView').addEventListener('click',()=>{view={scale:1,x:0,y:0};applyView();});
+  document.querySelectorAll('.tool').forEach(btn=>btn.addEventListener('click',()=>{if(btn.disabled)return;tool=btn.dataset.tool;render();}));
+  viewport.addEventListener('pointerdown',pointerDown); window.addEventListener('pointermove',pointerMove); window.addEventListener('pointerup',pointerUp);
+  viewport.addEventListener('contextmenu',e=>e.preventDefault());
+  viewport.addEventListener('wheel',e=>{e.preventDefault();const r=viewport.getBoundingClientRect();zoom(e.deltaY<0?1.08:1/1.08,e.clientX-r.left,e.clientY-r.top);},{passive:false});
+  $('loginBtn').addEventListener('click',login); $('editorCode').addEventListener('keydown',e=>{if(e.key==='Enter')login();}); $('logoutBtn').addEventListener('click',logout);
+  $('markerColor').addEventListener('input',()=>$('previewPin').style.background=$('markerColor').value);
+  $('saveMarker').addEventListener('click',saveSelectedMarker); $('deleteMarker').addEventListener('click',()=>{if(selectedMarkerId)deleteMarker(selectedMarkerId);});
+}
+
+async function initOnline() {
+  buildZones(); bind(); render();
+  if(!configured) {
+    $('setupBox').classList.remove('hidden'); $('loginBox').classList.add('hidden');
+    setOnline('warn','Нужна настройка'); setEditingUi(); return;
+  }
+  supabase=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  if(editorCode){
+    try { await apiAction('verify',{},editorCode); isEditor=true; }
+    catch { editorCode=''; sessionStorage.removeItem('la_editor_code'); isEditor=false; }
+  }
+  updateAuthUi();
+  await refreshAll(); await subscribeRealtime();
+}
+
+initOnline();
+</script>
+</body>
+</html>
