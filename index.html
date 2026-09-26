@@ -39,7 +39,8 @@ textarea{min-height:92px;resize:vertical}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:#101612}
 .tools{display:flex;gap:8px;flex-wrap:wrap} .tool{min-height:40px;display:inline-flex;align-items:center;gap:7px;border:1px solid #35453b;background:#1c251f;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:750}
 .tool.active{background:#263426;border-color:#74985c;color:#e1f3d5} .spacer{flex:1} .coord{font-size:12px;color:#bfccc4;min-width:110px;text-align:right}
-.language-select{height:40px;border:1px solid #35453b;background:#1c251f;color:var(--text);border-radius:10px;padding:0 10px;font-weight:700;cursor:pointer;outline:none}
+.language-select,.auth-select{height:40px;border:1px solid #35453b;background:#1c251f;color:var(--text);border-radius:10px;padding:0 10px;font-weight:700;cursor:pointer;outline:none}
+.auth-select{width:100%}
 .language-select:focus{border-color:#74985c}
 .online-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #344239;border-radius:999px;font-size:12px;color:#c9d5cc;background:#17201b}
 .online-dot{width:8px;height:8px;border-radius:50%;background:#777} .online-pill.ok .online-dot{background:var(--ok)} .online-pill.warn .online-dot{background:var(--warn)} .online-pill.bad .online-dot{background:#c15a5a}
@@ -134,6 +135,7 @@ textarea{min-height:92px;resize:vertical}
     </section>
 
     <div class="bottom-actions">
+      <button id="setAllianceMarkerCode" class="btn" type="button" style="width:100%;margin-bottom:8px">🔑 Код меток альянса</button>
       <button id="deleteAlliance" class="btn danger" type="button" style="width:100%">Удалить альянс</button>
     </div>
   </aside>
@@ -187,8 +189,14 @@ textarea{min-height:92px;resize:vertical}
       <div class="section-title" id="editorSectionTitle">Редактор</div>
       <div id="setupBox" class="setup-box hidden">Supabase ещё не настроен. Заполните <b>config.js</b>, затем обновите страницу.</div>
       <div id="loginBox" class="auth-grid">
-        <input id="editorCode" type="password" autocomplete="off" placeholder="Код редактора">
-        <button id="loginBtn" class="btn primary" type="button">Войти как редактор</button>
+        <div class="small" id="allianceAccessTitle"><b>Альянс — только свои метки</b></div>
+        <select id="allianceLoginSelect" class="auth-select"></select>
+        <input id="allianceEditorCode" type="password" autocomplete="off" placeholder="Код альянса">
+        <button id="allianceLoginBtn" class="btn primary" type="button">Войти для меток</button>
+        <div style="height:1px;background:var(--line);margin:5px 0"></div>
+        <div class="small" id="adminAccessTitle"><b>Администратор карты</b></div>
+        <input id="editorCode" type="password" autocomplete="off" placeholder="Код администратора">
+        <button id="loginBtn" class="btn" type="button">Войти как администратор</button>
       </div>
       <div id="logoutBox" class="hidden">
         <div class="status-card">
@@ -204,6 +212,7 @@ textarea{min-height:92px;resize:vertical}
 
     <section id="markerEditor" class="section hidden">
       <div class="section-title" id="markerEditorTitle">Редактор метки</div>
+      <div id="markerOwner" class="small" style="margin:0 0 12px"></div>
       <div class="field"><label for="markerText" id="markerTextLabel">Текст рядом с булавкой</label><input id="markerText" type="text" maxlength="40" placeholder="Например: Башня 1"></div>
       <div class="field"><label for="markerColor" id="markerColorLabel">Цвет булавки</label><input id="markerColor" type="color" value="#d55353"><div class="pin-preview"><div id="previewPin" class="preview-pin"></div><div class="small" id="pinColorHelp">Цвет булавки на карте.</div></div></div>
       <div class="field"><label for="markerComment" id="markerCommentLabel">Комментарий</label><textarea id="markerComment" placeholder="Дополнительная заметка"></textarea></div>
@@ -248,9 +257,10 @@ const EDITOR_API_URL = "https://aixcvtfagcbfeyjmwubu.supabase.co/functions/v1/la
 let supabase = null;
 let user = null;
 let editorCode = sessionStorage.getItem('la_editor_code') || '';
+let editorRole = sessionStorage.getItem('la_editor_role') || 'viewer';
+let editorAllianceId = sessionStorage.getItem('la_editor_alliance_id') || '';
 let currentLang = localStorage.getItem('la_language') === 'en' ? 'en' : 'ru';
 let currentOnlineKey = 'connecting';
-let isEditor = false;
 
 const I18N = {
   ru: {
@@ -274,7 +284,15 @@ const I18N = {
     enterCode:'Введите код редактора.', checking:'Проверка…', editorEnabled:'Режим редактора включён.',
     invalidCode:'Неверный код редактора.', loginError:'Ошибка входа: {error}', unknownError:'неизвестная ошибка',
     setupBox:'Supabase ещё не настроен. Обновите конфигурацию и перезагрузите страницу.',
-    royal:'Royal', city:'City', mobileEditor:'Редактор', closeEditor:'Закрыть'
+    royal:'Royal', city:'City', mobileEditor:'Редактор', closeEditor:'Закрыть',
+    allianceMarkerCode:'Код меток альянса', allianceOnlyMarkers:'Альянс — только свои метки',
+    allianceCode:'Код альянса', allianceLogin:'Войти для меток', adminAccess:'Администратор карты',
+    adminCode:'Код администратора', adminLogin:'Войти как администратор', administrator:'Администратор',
+    allianceRole:'Альянс {tag}', markerOwner:'Владелец: {tag}', markerOwnerNone:'Владелец: администратор',
+    foreignMarker:'Эта метка принадлежит другому альянсу.', adminRequired:'Это действие доступно только администратору.',
+    setAllianceCodePrompt:'Введите код для редактирования меток альянса {tag}:',
+    codeSet:'Код меток для {tag} установлен.', chooseAllianceLogin:'Выберите альянс.',
+    allianceCodeInvalid:'Неверный код альянса.'
   },
   en: {
     mainSubtitle:'ONLINE · one shared map for all players.',
@@ -297,7 +315,15 @@ const I18N = {
     enterCode:'Enter the editor code.', checking:'Checking…', editorEnabled:'Editor mode enabled.',
     invalidCode:'Incorrect editor code.', loginError:'Login error: {error}', unknownError:'unknown error',
     setupBox:'Supabase is not configured yet. Update the configuration and reload the page.',
-    royal:'Royal', city:'City', mobileEditor:'Editor', closeEditor:'Close'
+    royal:'Royal', city:'City', mobileEditor:'Editor', closeEditor:'Close',
+    allianceMarkerCode:'Alliance marker code', allianceOnlyMarkers:'Alliance — own markers only',
+    allianceCode:'Alliance code', allianceLogin:'Sign in for markers', adminAccess:'Map administrator',
+    adminCode:'Administrator code', adminLogin:'Sign in as administrator', administrator:'Administrator',
+    allianceRole:'Alliance {tag}', markerOwner:'Owner: {tag}', markerOwnerNone:'Owner: administrator',
+    foreignMarker:'This marker belongs to another alliance.', adminRequired:'This action is available to the administrator only.',
+    setAllianceCodePrompt:'Enter a marker editing code for alliance {tag}:',
+    codeSet:'Marker code for {tag} has been set.', chooseAllianceLogin:'Select an alliance.',
+    allianceCodeInvalid:'Incorrect alliance code.'
   }
 };
 
@@ -334,6 +360,7 @@ function applyLanguage() {
     $('allianceMessage').textContent = t('editAfterLogin');
   }
   $('alliancesTitle').textContent = t('alliances');
+  $('setAllianceMarkerCode').textContent = '🔑 ' + t('allianceMarkerCode');
   $('deleteAlliance').textContent = t('deleteAlliance');
   $('toolPaintText').textContent = t('paint');
   $('toolMarkerText').textContent = t('marker');
@@ -342,8 +369,12 @@ function applyLanguage() {
   $('resetView').textContent = t('reset');
   $('accessTitle').textContent = t('accessTitle');
   $('editorSectionTitle').textContent = t('editor');
-  $('editorCode').placeholder = t('editorCode');
-  $('loginBtn').textContent = t('login');
+  $('allianceAccessTitle').innerHTML = '<b>'+t('allianceOnlyMarkers')+'</b>';
+  $('allianceEditorCode').placeholder = t('allianceCode');
+  $('allianceLoginBtn').textContent = t('allianceLogin');
+  $('adminAccessTitle').innerHTML = '<b>'+t('adminAccess')+'</b>';
+  $('editorCode').placeholder = t('adminCode');
+  $('loginBtn').textContent = t('adminLogin');
   $('modeLabel').textContent = t('mode');
   $('editorModeValue').textContent = t('editor');
   $('userLabel').textContent = t('user');
@@ -373,6 +404,7 @@ function applyLanguage() {
   const city = royalLayer.querySelector('.royal-sub');
   if (royal) royal.textContent = t('royal');
   if (city) city.textContent = t('city');
+  renderMarkerOwner();
 }
 
 $('mapTitle').textContent = cfg.mapTitle || 'Last Asylum Alliance Map';
@@ -392,6 +424,19 @@ function activeAlliance() {
 function markerById(id) {
   return data.markers.find(m => m.id === id) || null;
 }
+function isAdmin() { return editorRole === 'admin'; }
+function isAllianceEditor() { return editorRole === 'alliance'; }
+function canEditMarker(marker) {
+  if (!marker) return false;
+  return isAdmin() || (isAllianceEditor() && marker.alliance_id === editorAllianceId);
+}
+function requireAdmin() {
+  if (!isAdmin()) {
+    toast(t('adminRequired'));
+    return false;
+  }
+  return true;
+}
 function toast(message, ms=2600) {
   const el = $('toast');
   el.textContent = message;
@@ -407,7 +452,7 @@ function setOnline(mode, key) {
   $('onlineText').textContent = t(key);
 }
 function requireEditor() {
-  if (!isEditor) {
+  if (editorRole === 'viewer') {
     toast(t('editorRequired'));
     return false;
   }
@@ -447,6 +492,18 @@ function renderAlliances() {
   }
   $('statAlliances').textContent = String(data.alliances.length);
   $('statActiveAlliance').textContent = activeAlliance()?.tag || '—';
+
+  const loginSelect = $('allianceLoginSelect');
+  const previous = loginSelect.value || editorAllianceId;
+  loginSelect.innerHTML = '';
+  for (const a of data.alliances) {
+    const option = document.createElement('option');
+    option.value = a.id;
+    option.textContent = a.tag;
+    loginSelect.appendChild(option);
+  }
+  if (previous && data.alliances.some(a => a.id === previous)) loginSelect.value = previous;
+  else if (data.alliances[0]) loginSelect.value = data.alliances[0].id;
 }
 
 function renderZones() {
@@ -487,34 +544,62 @@ function renderMarkers() {
   $('statMarkers').textContent=String(data.markers.length);
 }
 
+function renderMarkerOwner() {
+  const m=markerById(selectedMarkerId);
+  if (!m || !$('markerOwner')) return;
+  const owner=data.alliances.find(a=>a.id===m.alliance_id);
+  $('markerOwner').textContent = owner ? t('markerOwner',{tag:owner.tag}) : t('markerOwnerNone');
+}
 function renderMarkerEditor() {
   const m=markerById(selectedMarkerId);
   if(!m){ $('markerEmpty').classList.remove('hidden'); $('markerEditor').classList.add('hidden'); return; }
   $('markerEmpty').classList.add('hidden'); $('markerEditor').classList.remove('hidden');
   $('markerText').value=m.text||''; $('markerColor').value=m.color||'#d55353'; $('markerComment').value=m.comment||'';
   $('previewPin').style.background=m.color||'#d55353';
+  renderMarkerOwner();
 }
 
 function setEditingUi() {
-  $('addAlliance').disabled=!isEditor || !configured;
-  $('allianceName').disabled=!isEditor || !configured;
-  $('allianceColor').disabled=!isEditor || !configured;
-  $('deleteAlliance').disabled=!isEditor || !configured;
-  document.querySelector('[data-tool="paint"]').disabled=!isEditor || !configured;
-  document.querySelector('[data-tool="marker"]').disabled=!isEditor || !configured;
-  document.querySelector('[data-tool="erase"]').disabled=!isEditor || !configured;
-  $('markerText').disabled=!isEditor; $('markerColor').disabled=!isEditor; $('markerComment').disabled=!isEditor;
-  $('saveMarker').disabled=!isEditor; $('deleteMarker').disabled=!isEditor;
-  if(!isEditor && tool!=='pan') tool='pan';
+  const admin=isAdmin();
+  const markerEditor=editorRole !== 'viewer';
+  const selectedMarker=markerById(selectedMarkerId);
+  const mayEditSelected=canEditMarker(selectedMarker);
+
+  $('addAlliance').disabled=!admin || !configured;
+  $('allianceName').disabled=!admin || !configured;
+  $('allianceColor').disabled=!admin || !configured;
+  $('setAllianceMarkerCode').disabled=!admin || !configured || !activeAlliance();
+  $('deleteAlliance').disabled=!admin || !configured;
+  document.querySelector('[data-tool="paint"]').disabled=!admin || !configured;
+  document.querySelector('[data-tool="marker"]').disabled=!markerEditor || !configured;
+  document.querySelector('[data-tool="erase"]').disabled=!markerEditor || !configured;
+  $('markerText').disabled=!mayEditSelected;
+  $('markerColor').disabled=!mayEditSelected;
+  $('markerComment').disabled=!mayEditSelected;
+  $('saveMarker').disabled=!mayEditSelected;
+  $('deleteMarker').disabled=!mayEditSelected;
+
+  if(editorRole==='viewer' && tool!=='pan') tool='pan';
+  if(isAllianceEditor() && tool==='paint') tool='pan';
   document.querySelectorAll('.tool').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===tool));
-  $('accessSubtitle').textContent = isEditor ? t('editMode') : t('publicView');
+  $('accessSubtitle').textContent = editorRole==='viewer' ? t('publicView') : t('editMode');
 }
 
 function updateAuthUi() {
-  $('loginBox').classList.toggle('hidden', isEditor);
-  $('logoutBox').classList.toggle('hidden', !isEditor);
-  if (isEditor) $('userEmail').textContent = t('codeAccess');
-  $('authMessage').textContent = isEditor ? t('editorEnabled') : '';
+  const loggedIn=editorRole!=='viewer';
+  $('loginBox').classList.toggle('hidden', loggedIn);
+  $('logoutBox').classList.toggle('hidden', !loggedIn);
+  if (loggedIn) {
+    if (isAdmin()) {
+      $('editorModeValue').textContent=t('administrator');
+      $('userEmail').textContent=t('codeAccess');
+    } else {
+      const a=data.alliances.find(x=>x.id===editorAllianceId);
+      $('editorModeValue').textContent=t('allianceRole',{tag:a?.tag||'—'});
+      $('userEmail').textContent=a?.tag||'—';
+    }
+  }
+  $('authMessage').textContent = loggedIn ? t('editorEnabled') : '';
   setEditingUi();
 }
 
@@ -532,7 +617,7 @@ async function refreshAll() {
     const [aRes,tRes,mRes]=await Promise.all([
       supabase.from('alliances').select('id,tag,color').eq('map_id',MAP_ID).order('created_at'),
       supabase.from('territories').select('territory_id,alliance_id').eq('map_id',MAP_ID),
-      supabase.from('markers').select('id,x,y,text,comment,color,created_at').eq('map_id',MAP_ID).order('created_at')
+      supabase.from('markers').select('id,x,y,text,comment,color,alliance_id,created_at').eq('map_id',MAP_ID).order('created_at')
     ]);
     for (const r of [aRes,tRes,mRes]) if(r.error) throw r.error;
     data.alliances=aRes.data||[];
@@ -581,7 +666,7 @@ async function apiAction(action, payload={}, codeOverride=null) {
 }
 
 async function addAlliance() {
-  if(!requireEditor()) return;
+  if(!requireAdmin()) return;
   const tag=$('allianceName').value.trim().toUpperCase();
   if(!tag){$('allianceMessage').textContent=t('enterAlliance');return;}
   try {
@@ -595,7 +680,7 @@ async function addAlliance() {
 }
 
 async function deleteActiveAlliance() {
-  if(!requireEditor()) return;
+  if(!requireAdmin()) return;
   const a=activeAlliance(); if(!a){toast(t('chooseAlliance'));return;}
   if(!confirm(t('confirmDelete',{tag:a.tag}))) return;
   try {
@@ -607,8 +692,23 @@ async function deleteActiveAlliance() {
   }
 }
 
+async function setAllianceMarkerCode() {
+  if(!requireAdmin()) return;
+  const a=activeAlliance();
+  if(!a){toast(t('chooseAlliance'));return;}
+  const code=prompt(t('setAllianceCodePrompt',{tag:a.tag}), '');
+  if(code===null) return;
+  if(code.trim().length<4){toast(t('enterCode'));return;}
+  try {
+    await apiAction('setAllianceMarkerCode',{allianceId:a.id,code:code.trim()});
+    toast(t('codeSet',{tag:a.tag}));
+  } catch(error) {
+    toast(t('error',{error:error.message}));
+  }
+}
+
 async function paintRegion(id) {
-  if(!requireEditor())return;
+  if(!requireAdmin())return;
   const a=activeAlliance(); if(!a){toast(t('selectAllianceFirst'));return;}
   try {
     await apiAction('paint',{territoryId:id,allianceId:a.id});
@@ -618,7 +718,7 @@ async function paintRegion(id) {
 }
 
 async function clearRegion(id) {
-  if(!requireEditor())return;
+  if(!requireAdmin())return;
   try {
     await apiAction('clear',{territoryId:id});
   } catch(error) {
@@ -630,11 +730,14 @@ async function addMarker(x,y) {
   if(!requireEditor())return;
   const a=activeAlliance();
   try {
+    const ownerId=isAdmin() ? (a?.id||null) : editorAllianceId;
+    const ownerAlliance=data.alliances.find(x=>x.id===ownerId);
     const result=await apiAction('addMarker',{
+      allianceId:ownerId,
       x:Math.round(x),y:Math.round(y),
-      text:a?.tag||t('markerDefault'),
+      text:ownerAlliance?.tag||t('markerDefault'),
       comment:'',
-      color:a?.color||'#d55353'
+      color:ownerAlliance?.color||'#d55353'
     });
     selectedMarkerId=result.id||null;
     await refreshAll();
@@ -657,9 +760,11 @@ function selectMarker(id){
 async function saveSelectedMarker() {
   if(!requireEditor())return;
   const m=markerById(selectedMarkerId); if(!m)return;
+  if(!canEditMarker(m)){toast(t('foreignMarker'));return;}
   try {
     await apiAction('updateMarker',{
       id:m.id,
+      allianceId:editorAllianceId,
       text:$('markerText').value.trim()||t('markerDefault'),
       color:$('markerColor').value,
       comment:$('markerComment').value
@@ -673,8 +778,10 @@ async function saveSelectedMarker() {
 
 async function deleteMarker(id) {
   if(!requireEditor())return;
+  const m=markerById(id);
+  if(!canEditMarker(m)){toast(t('foreignMarker'));return;}
   try {
-    await apiAction('deleteMarker',{id});
+    await apiAction('deleteMarker',{id,allianceId:editorAllianceId});
     if(selectedMarkerId===id)selectedMarkerId=null;
     await refreshAll();
   } catch(error) {
@@ -692,7 +799,11 @@ function pointerDown(e) {
   const marker=e.target.closest('.marker');
   if(marker){ if(tool==='erase'){deleteMarker(marker.dataset.id);return;} selectMarker(marker.dataset.id);return; }
   if(tool==='paint'&&region){paintRegion(region.dataset.id);return;}
-  if(tool==='erase'&&region){clearRegion(region.dataset.id);return;}
+  if(tool==='erase'&&region){
+    if(isAdmin()) clearRegion(region.dataset.id);
+    else toast(t('adminRequired'));
+    return;
+  }
   if(tool==='marker'){const p=screenToMap(e.clientX,e.clientY);addMarker(p.x,p.y);return;}
   if(tool==='pan'||e.button===1||e.button===2){drag={x:e.clientX,y:e.clientY,viewX:view.x,viewY:view.y};e.preventDefault();}
 }
@@ -707,29 +818,58 @@ function zoom(factor,anchorX=viewport.clientWidth/2,anchorY=viewport.clientHeigh
   view.x=(view.x-cx)*(next/old)+cx; view.y=(view.y-cy)*(next/old)+cy; view.scale=next; applyView();
 }
 
-async function login() {
+async function loginAdmin() {
   const code=$('editorCode').value.trim();
   if(!code){$('authMessage').textContent=t('enterCode');return;}
   $('authMessage').textContent=t('checking');
   try {
     await apiAction('verify',{},code);
     editorCode=code;
+    editorRole='admin';
+    editorAllianceId='';
     sessionStorage.setItem('la_editor_code',code);
-    isEditor=true;
+    sessionStorage.setItem('la_editor_role','admin');
+    sessionStorage.removeItem('la_editor_alliance_id');
     $('editorCode').value='';
-    $('authMessage').textContent=t('editorEnabled');
     updateAuthUi(); render();
   } catch(error) {
-    isEditor=false;
+    editorRole='viewer';
     $('authMessage').textContent = error?.message === 'invalid editor code'
       ? t('invalidCode')
       : t('loginError',{error:error?.message || t('unknownError')});
   }
 }
+async function loginAlliance() {
+  const allianceId=$('allianceLoginSelect').value;
+  const code=$('allianceEditorCode').value.trim();
+  if(!allianceId){$('authMessage').textContent=t('chooseAllianceLogin');return;}
+  if(!code){$('authMessage').textContent=t('enterCode');return;}
+  $('authMessage').textContent=t('checking');
+  try {
+    await apiAction('verifyAlliance',{allianceId},code);
+    editorCode=code;
+    editorRole='alliance';
+    editorAllianceId=allianceId;
+    selectedAllianceId=allianceId;
+    sessionStorage.setItem('la_editor_code',code);
+    sessionStorage.setItem('la_editor_role','alliance');
+    sessionStorage.setItem('la_editor_alliance_id',allianceId);
+    $('allianceEditorCode').value='';
+    updateAuthUi(); render();
+  } catch(error) {
+    editorRole='viewer';
+    $('authMessage').textContent = error?.message === 'invalid alliance code'
+      ? t('allianceCodeInvalid')
+      : t('loginError',{error:error?.message || t('unknownError')});
+  }
+}
 async function logout(){
   editorCode='';
+  editorRole='viewer';
+  editorAllianceId='';
   sessionStorage.removeItem('la_editor_code');
-  isEditor=false;
+  sessionStorage.removeItem('la_editor_role');
+  sessionStorage.removeItem('la_editor_alliance_id');
   selectedMarkerId=null;
   updateAuthUi();render();
 }
@@ -760,13 +900,18 @@ function bind() {
   });
   $('addAlliance').addEventListener('click',addAlliance);
   $('allianceName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addAlliance();}});
+  $('setAllianceMarkerCode').addEventListener('click',setAllianceMarkerCode);
   $('deleteAlliance').addEventListener('click',deleteActiveAlliance);
   $('zoomIn').addEventListener('click',()=>zoom(1.12)); $('zoomOut').addEventListener('click',()=>zoom(1/1.12)); $('resetView').addEventListener('click',()=>{view={scale:1,x:0,y:0};applyView();});
   document.querySelectorAll('.tool').forEach(btn=>btn.addEventListener('click',()=>{if(btn.disabled)return;tool=btn.dataset.tool;render();}));
   viewport.addEventListener('pointerdown',pointerDown); window.addEventListener('pointermove',pointerMove); window.addEventListener('pointerup',pointerUp);
   viewport.addEventListener('contextmenu',e=>e.preventDefault());
   viewport.addEventListener('wheel',e=>{e.preventDefault();const r=viewport.getBoundingClientRect();zoom(e.deltaY<0?1.08:1/1.08,e.clientX-r.left,e.clientY-r.top);},{passive:false});
-  $('loginBtn').addEventListener('click',login); $('editorCode').addEventListener('keydown',e=>{if(e.key==='Enter')login();}); $('logoutBtn').addEventListener('click',logout);
+  $('loginBtn').addEventListener('click',loginAdmin);
+  $('editorCode').addEventListener('keydown',e=>{if(e.key==='Enter')loginAdmin();});
+  $('allianceLoginBtn').addEventListener('click',loginAlliance);
+  $('allianceEditorCode').addEventListener('keydown',e=>{if(e.key==='Enter')loginAlliance();});
+  $('logoutBtn').addEventListener('click',logout);
   $('markerColor').addEventListener('input',()=>$('previewPin').style.background=$('markerColor').value);
   $('saveMarker').addEventListener('click',saveSelectedMarker); $('deleteMarker').addEventListener('click',()=>{if(selectedMarkerId)deleteMarker(selectedMarkerId);});
 }
@@ -778,9 +923,24 @@ async function initOnline() {
     setOnline('warn','setupNeeded'); setEditingUi(); return;
   }
   supabase=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-  if(editorCode){
-    try { await apiAction('verify',{},editorCode); isEditor=true; }
-    catch { editorCode=''; sessionStorage.removeItem('la_editor_code'); isEditor=false; }
+  if(editorCode && editorRole==='admin'){
+    try { await apiAction('verify',{},editorCode); }
+    catch {
+      editorCode=''; editorRole='viewer'; editorAllianceId='';
+      sessionStorage.removeItem('la_editor_code');
+      sessionStorage.removeItem('la_editor_role');
+      sessionStorage.removeItem('la_editor_alliance_id');
+    }
+  } else if(editorCode && editorRole==='alliance' && editorAllianceId){
+    try { await apiAction('verifyAlliance',{allianceId:editorAllianceId},editorCode); selectedAllianceId=editorAllianceId; }
+    catch {
+      editorCode=''; editorRole='viewer'; editorAllianceId='';
+      sessionStorage.removeItem('la_editor_code');
+      sessionStorage.removeItem('la_editor_role');
+      sessionStorage.removeItem('la_editor_alliance_id');
+    }
+  } else {
+    editorRole='viewer';
   }
   updateAuthUi();
   await refreshAll(); await subscribeRealtime();
