@@ -39,6 +39,8 @@ textarea{min-height:92px;resize:vertical}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:#101612}
 .tools{display:flex;gap:8px;flex-wrap:wrap} .tool{min-height:40px;display:inline-flex;align-items:center;gap:7px;border:1px solid #35453b;background:#1c251f;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:750}
 .tool.active{background:#263426;border-color:#74985c;color:#e1f3d5} .spacer{flex:1} .coord{font-size:12px;color:#bfccc4;min-width:110px;text-align:right}
+.language-select{height:40px;border:1px solid #35453b;background:#1c251f;color:var(--text);border-radius:10px;padding:0 10px;font-weight:700;cursor:pointer;outline:none}
+.language-select:focus{border-color:#74985c}
 .online-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #344239;border-radius:999px;font-size:12px;color:#c9d5cc;background:#17201b}
 .online-dot{width:8px;height:8px;border-radius:50%;background:#777} .online-pill.ok .online-dot{background:var(--ok)} .online-pill.warn .online-dot{background:var(--warn)} .online-pill.bad .online-dot{background:#c15a5a}
 .viewport{position:relative;flex:1;min-height:680px;overflow:hidden;touch-action:none;background:radial-gradient(circle at center,#17211a 0,#0b100d 72%)}
@@ -70,11 +72,11 @@ textarea{min-height:92px;resize:vertical}
   <aside class="sidebar">
     <div class="head">
       <div class="title" id="mapTitle">Last Asylum Alliance Map</div>
-      <div class="subtitle">ONLINE · одна общая карта для всех игроков.</div>
+      <div class="subtitle" id="mainSubtitle">ONLINE · одна общая карта для всех игроков.</div>
     </div>
 
     <section class="section">
-      <div class="section-title">Добавить альянс</div>
+      <div class="section-title" id="addAllianceTitle">Добавить альянс</div>
       <div class="add-row">
         <input id="allianceName" type="text" maxlength="18" placeholder="Тег альянса">
         <input id="allianceColor" type="color" value="#38a169" aria-label="Цвет альянса">
@@ -84,7 +86,7 @@ textarea{min-height:92px;resize:vertical}
     </section>
 
     <section class="section grow">
-      <div class="section-title">Альянсы</div>
+      <div class="section-title" id="alliancesTitle">Альянсы</div>
       <div id="allianceList" class="alliance-list"></div>
     </section>
 
@@ -96,12 +98,16 @@ textarea{min-height:92px;resize:vertical}
   <main class="main">
     <div class="toolbar">
       <div class="tools" role="group" aria-label="Инструменты">
-        <button class="tool active" data-tool="paint" type="button">🎨 <span>Выбор</span></button>
-        <button class="tool" data-tool="marker" type="button">📍 <span>Метка</span></button>
-        <button class="tool" data-tool="pan" type="button">✋ <span>Карта</span></button>
-        <button class="tool" data-tool="erase" type="button">🧽 <span>Ластик</span></button>
+        <button class="tool active" data-tool="paint" type="button">🎨 <span id="toolPaintText">Выбор</span></button>
+        <button class="tool" data-tool="marker" type="button">📍 <span id="toolMarkerText">Метка</span></button>
+        <button class="tool" data-tool="pan" type="button">✋ <span id="toolPanText">Карта</span></button>
+        <button class="tool" data-tool="erase" type="button">🧽 <span id="toolEraseText">Ластик</span></button>
       </div>
       <div class="spacer"></div>
+      <select id="languageSelect" class="language-select" aria-label="Language">
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+      </select>
       <div id="onlineStatus" class="online-pill warn"><span class="online-dot"></span><span id="onlineText">Подключение…</span></div>
       <button id="zoomOut" class="btn" type="button">−</button>
       <button id="zoomIn" class="btn" type="button">＋</button>
@@ -123,18 +129,18 @@ textarea{min-height:92px;resize:vertical}
           </svg>
         </div>
       </div>
-      <div class="help">Игроки без входа видят общую карту. Редакторы после входа могут красить территории, добавлять/удалять альянсы и работать с метками. Изменения синхронизируются через Supabase Realtime.</div>
+      <div class="help" id="mapHelp">Игроки без входа видят общую карту. Редакторы после входа могут красить территории, добавлять/удалять альянсы и работать с метками. Изменения синхронизируются через Supabase Realtime.</div>
     </div>
   </main>
 
   <aside class="editor">
     <div class="head">
-      <div class="title" style="font-size:19px">Доступ и метки</div>
+      <div class="title" id="accessTitle" style="font-size:19px">Доступ и метки</div>
       <div class="subtitle" id="accessSubtitle">Публичный просмотр</div>
     </div>
 
     <section class="section">
-      <div class="section-title">Редактор</div>
+      <div class="section-title" id="editorSectionTitle">Редактор</div>
       <div id="setupBox" class="setup-box hidden">Supabase ещё не настроен. Заполните <b>config.js</b>, затем обновите страницу.</div>
       <div id="loginBox" class="auth-grid">
         <input id="editorCode" type="password" autocomplete="off" placeholder="Код редактора">
@@ -142,8 +148,8 @@ textarea{min-height:92px;resize:vertical}
       </div>
       <div id="logoutBox" class="hidden">
         <div class="status-card">
-          <div class="status-line"><span>Режим</span><strong>Редактор</strong></div>
-          <div class="status-line"><span>Пользователь</span><strong id="userEmail">—</strong></div>
+          <div class="status-line"><span id="modeLabel">Режим</span><strong id="editorModeValue">Редактор</strong></div>
+          <div class="status-line"><span id="userLabel">Пользователь</span><strong id="userEmail">—</strong></div>
         </div>
         <button id="logoutBtn" class="btn" type="button" style="width:100%;margin-top:8px">Выйти</button>
       </div>
@@ -153,20 +159,20 @@ textarea{min-height:92px;resize:vertical}
     <div id="markerEmpty" class="editor-empty">Метка не выбрана. Инструмент «Метка» ставит булавку. После этого здесь можно изменить текст, цвет и комментарий.</div>
 
     <section id="markerEditor" class="section hidden">
-      <div class="section-title">Редактор метки</div>
-      <div class="field"><label for="markerText">Текст рядом с булавкой</label><input id="markerText" type="text" maxlength="40" placeholder="Например: Башня 1"></div>
-      <div class="field"><label for="markerColor">Цвет булавки</label><input id="markerColor" type="color" value="#d55353"><div class="pin-preview"><div id="previewPin" class="preview-pin"></div><div class="small">Цвет булавки на карте.</div></div></div>
-      <div class="field"><label for="markerComment">Комментарий</label><textarea id="markerComment" placeholder="Дополнительная заметка"></textarea></div>
+      <div class="section-title" id="markerEditorTitle">Редактор метки</div>
+      <div class="field"><label for="markerText" id="markerTextLabel">Текст рядом с булавкой</label><input id="markerText" type="text" maxlength="40" placeholder="Например: Башня 1"></div>
+      <div class="field"><label for="markerColor" id="markerColorLabel">Цвет булавки</label><input id="markerColor" type="color" value="#d55353"><div class="pin-preview"><div id="previewPin" class="preview-pin"></div><div class="small" id="pinColorHelp">Цвет булавки на карте.</div></div></div>
+      <div class="field"><label for="markerComment" id="markerCommentLabel">Комментарий</label><textarea id="markerComment" placeholder="Дополнительная заметка"></textarea></div>
       <div class="editor-actions"><button id="saveMarker" class="btn" type="button">Сохранить</button><button id="deleteMarker" class="btn danger" type="button">Удалить метку</button></div>
     </section>
 
     <section class="section">
-      <div class="section-title">Статус</div>
+      <div class="section-title" id="statusTitle">Статус</div>
       <div class="status-card">
-        <div class="status-line"><span>Территорий</span><strong id="statTerritories">0</strong></div>
-        <div class="status-line"><span>Маркеров</span><strong id="statMarkers">0</strong></div>
-        <div class="status-line"><span>Альянсов</span><strong id="statAlliances">0</strong></div>
-        <div class="status-line"><span>Активный</span><strong id="statActiveAlliance">—</strong></div>
+        <div class="status-line"><span id="territoriesLabel">Территорий</span><strong id="statTerritories">0</strong></div>
+        <div class="status-line"><span id="markersLabel">Маркеров</span><strong id="statMarkers">0</strong></div>
+        <div class="status-line"><span id="alliancesCountLabel">Альянсов</span><strong id="statAlliances">0</strong></div>
+        <div class="status-line"><span id="activeLabel">Активный</span><strong id="statActiveAlliance">—</strong></div>
       </div>
     </section>
   </aside>
@@ -197,7 +203,64 @@ const EDITOR_API_URL = "https://aixcvtfagcbfeyjmwubu.supabase.co/functions/v1/la
 let supabase = null;
 let user = null;
 let editorCode = sessionStorage.getItem('la_editor_code') || '';
+let currentLang = localStorage.getItem('la_language') === 'en' ? 'en' : 'ru';
+let currentOnlineKey = 'connecting';
 let isEditor = false;
+
+const I18N = {
+  ru: {
+    mainSubtitle:'ONLINE · одна общая карта для всех игроков.',
+    addAlliance:'Добавить альянс', alliancePlaceholder:'Тег альянса', allianceColor:'Цвет альянса',
+    editAfterLogin:'Редактирование доступно после входа.', alliances:'Альянсы', deleteAlliance:'Удалить альянс',
+    paint:'Выбор', marker:'Метка', map:'Карта', eraser:'Ластик', connecting:'Подключение…', online:'Онлайн',
+    connectionError:'Ошибка связи', realtimeError:'Realtime ошибка', setupNeeded:'Нужна настройка', reset:'Сброс',
+    mapHelp:'Игроки без входа видят общую карту. Редакторы после входа могут красить территории, добавлять/удалять альянсы и работать с метками. Изменения синхронизируются через Supabase Realtime.',
+    accessTitle:'Доступ и метки', publicView:'Публичный просмотр', editMode:'Режим редактирования',
+    editor:'Редактор', editorCode:'Код редактора', login:'Войти как редактор', mode:'Режим', user:'Пользователь',
+    codeAccess:'Доступ по коду', logout:'Выйти', markerEmpty:'Метка не выбрана. Инструмент «Метка» ставит булавку. После этого здесь можно изменить текст, цвет и комментарий.',
+    markerEditor:'Редактор метки', markerText:'Текст рядом с булавкой', markerTextPlaceholder:'Например: Башня 1',
+    markerColor:'Цвет булавки', pinColorHelp:'Цвет булавки на карте.', comment:'Комментарий',
+    commentPlaceholder:'Дополнительная заметка', save:'Сохранить', deleteMarker:'Удалить метку',
+    status:'Статус', territories:'Территорий', markers:'Маркеров', alliancesCount:'Альянсов', active:'Активный',
+    editorRequired:'Для изменения карты войдите как редактор.', loadFailed:'Не удалось загрузить общую карту.',
+    enterAlliance:'Введите тег альянса.', allianceAdded:'Альянс {tag} добавлен.', error:'Ошибка: {error}',
+    chooseAlliance:'Выберите альянс.', confirmDelete:'Удалить альянс {tag} и очистить его территории?',
+    selectAllianceFirst:'Сначала выберите альянс.', markerDefault:'Метка', markerSaved:'Метка сохранена.',
+    enterCode:'Введите код редактора.', checking:'Проверка…', editorEnabled:'Режим редактора включён.',
+    invalidCode:'Неверный код редактора.', loginError:'Ошибка входа: {error}', unknownError:'неизвестная ошибка',
+    setupBox:'Supabase ещё не настроен. Обновите конфигурацию и перезагрузите страницу.',
+    royal:'Royal', city:'City'
+  },
+  en: {
+    mainSubtitle:'ONLINE · one shared map for all players.',
+    addAlliance:'Add alliance', alliancePlaceholder:'Alliance tag', allianceColor:'Alliance color',
+    editAfterLogin:'Editing is available after signing in.', alliances:'Alliances', deleteAlliance:'Delete alliance',
+    paint:'Select', marker:'Marker', map:'Map', eraser:'Eraser', connecting:'Connecting…', online:'Online',
+    connectionError:'Connection error', realtimeError:'Realtime error', setupNeeded:'Setup required', reset:'Reset',
+    mapHelp:'Players can view the shared map without signing in. Editors can color territories, add or remove alliances, and manage markers. Changes are synchronized through Supabase Realtime.',
+    accessTitle:'Access & markers', publicView:'Public view', editMode:'Editing mode',
+    editor:'Editor', editorCode:'Editor code', login:'Sign in as editor', mode:'Mode', user:'User',
+    codeAccess:'Code access', logout:'Sign out', markerEmpty:'No marker selected. Choose “Marker” and click the map. Then you can edit its text, color, and comment here.',
+    markerEditor:'Marker editor', markerText:'Text next to pin', markerTextPlaceholder:'Example: Tower 1',
+    markerColor:'Pin color', pinColorHelp:'Pin color on the map.', comment:'Comment',
+    commentPlaceholder:'Additional note', save:'Save', deleteMarker:'Delete marker',
+    status:'Status', territories:'Territories', markers:'Markers', alliancesCount:'Alliances', active:'Active',
+    editorRequired:'Sign in as an editor to change the map.', loadFailed:'Could not load the shared map.',
+    enterAlliance:'Enter an alliance tag.', allianceAdded:'Alliance {tag} added.', error:'Error: {error}',
+    chooseAlliance:'Select an alliance.', confirmDelete:'Delete alliance {tag} and clear its territories?',
+    selectAllianceFirst:'Select an alliance first.', markerDefault:'Marker', markerSaved:'Marker saved.',
+    enterCode:'Enter the editor code.', checking:'Checking…', editorEnabled:'Editor mode enabled.',
+    invalidCode:'Incorrect editor code.', loginError:'Login error: {error}', unknownError:'unknown error',
+    setupBox:'Supabase is not configured yet. Update the configuration and reload the page.',
+    royal:'Royal', city:'City'
+  }
+};
+
+function t(key, vars={}) {
+  let value = I18N[currentLang]?.[key] ?? I18N.ru[key] ?? key;
+  for (const [k,v] of Object.entries(vars)) value = value.replaceAll('{'+k+'}', String(v));
+  return value;
+}
 let tool = 'pan';
 let drag = null;
 let selectedAllianceId = null;
@@ -214,6 +277,57 @@ const tagLayer = $('tagLayer');
 const levelLayer = $('levelLayer');
 const markerLayer = $('markerLayer');
 const royalLayer = $('royalLayer');
+
+function applyLanguage() {
+  document.documentElement.lang = currentLang;
+  $('languageSelect').value = currentLang;
+  $('mainSubtitle').textContent = t('mainSubtitle');
+  $('addAllianceTitle').textContent = t('addAlliance');
+  $('allianceName').placeholder = t('alliancePlaceholder');
+  $('allianceColor').setAttribute('aria-label', t('allianceColor'));
+  if (!isEditor && !$('allianceMessage').textContent.startsWith('Альянс') && !$('allianceMessage').textContent.startsWith('Alliance')) {
+    $('allianceMessage').textContent = t('editAfterLogin');
+  }
+  $('alliancesTitle').textContent = t('alliances');
+  $('deleteAlliance').textContent = t('deleteAlliance');
+  $('toolPaintText').textContent = t('paint');
+  $('toolMarkerText').textContent = t('marker');
+  $('toolPanText').textContent = t('map');
+  $('toolEraseText').textContent = t('eraser');
+  $('resetView').textContent = t('reset');
+  $('mapHelp').textContent = t('mapHelp');
+  $('accessTitle').textContent = t('accessTitle');
+  $('editorSectionTitle').textContent = t('editor');
+  $('editorCode').placeholder = t('editorCode');
+  $('loginBtn').textContent = t('login');
+  $('modeLabel').textContent = t('mode');
+  $('editorModeValue').textContent = t('editor');
+  $('userLabel').textContent = t('user');
+  $('logoutBtn').textContent = t('logout');
+  $('markerEmpty').textContent = t('markerEmpty');
+  $('markerEditorTitle').textContent = t('markerEditor');
+  $('markerTextLabel').textContent = t('markerText');
+  $('markerText').placeholder = t('markerTextPlaceholder');
+  $('markerColorLabel').textContent = t('markerColor');
+  $('pinColorHelp').textContent = t('pinColorHelp');
+  $('markerCommentLabel').textContent = t('comment');
+  $('markerComment').placeholder = t('commentPlaceholder');
+  $('saveMarker').textContent = t('save');
+  $('deleteMarker').textContent = t('deleteMarker');
+  $('statusTitle').textContent = t('status');
+  $('territoriesLabel').textContent = t('territories');
+  $('markersLabel').textContent = t('markers');
+  $('alliancesCountLabel').textContent = t('alliancesCount');
+  $('activeLabel').textContent = t('active');
+  $('setupBox').textContent = t('setupBox');
+  $('accessSubtitle').textContent = isEditor ? t('editMode') : t('publicView');
+  if (isEditor) $('userEmail').textContent = t('codeAccess');
+  $('onlineText').textContent = t(currentOnlineKey);
+  const royal = royalLayer.querySelector('.royal-label');
+  const city = royalLayer.querySelector('.royal-sub');
+  if (royal) royal.textContent = t('royal');
+  if (city) city.textContent = t('city');
+}
 
 $('mapTitle').textContent = cfg.mapTitle || 'Last Asylum Alliance Map';
 
@@ -239,15 +353,16 @@ function toast(message, ms=2600) {
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.add('hidden'), ms);
 }
-function setOnline(mode, text) {
+function setOnline(mode, key) {
+  currentOnlineKey = key;
   const el = $('onlineStatus');
   el.classList.remove('ok','warn','bad');
   el.classList.add(mode);
-  $('onlineText').textContent = text;
+  $('onlineText').textContent = t(key);
 }
 function requireEditor() {
   if (!isEditor) {
-    toast('Для изменения карты войдите как редактор.');
+    toast(t('editorRequired'));
     return false;
   }
   return true;
@@ -346,14 +461,14 @@ function setEditingUi() {
   $('saveMarker').disabled=!isEditor; $('deleteMarker').disabled=!isEditor;
   if(!isEditor && tool!=='pan') tool='pan';
   document.querySelectorAll('.tool').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===tool));
-  $('accessSubtitle').textContent = isEditor ? 'Режим редактирования' : 'Публичный просмотр';
+  $('accessSubtitle').textContent = isEditor ? t('editMode') : t('publicView');
 }
 
 function updateAuthUi() {
   $('loginBox').classList.toggle('hidden', isEditor);
   $('logoutBox').classList.toggle('hidden', !isEditor);
-  if (isEditor) $('userEmail').textContent = 'Доступ по коду';
-  $('authMessage').textContent = isEditor ? 'Режим редактора включён.' : '';
+  if (isEditor) $('userEmail').textContent = t('codeAccess');
+  $('authMessage').textContent = isEditor ? t('editorEnabled') : '';
   setEditingUi();
 }
 
@@ -381,11 +496,11 @@ async function refreshAll() {
     if(!selectedAllianceId && data.alliances[0]) selectedAllianceId=data.alliances[0].id;
     if(selectedMarkerId && !data.markers.some(m=>m.id===selectedMarkerId)) selectedMarkerId=null;
     render();
-    setOnline('ok','Онлайн');
+    setOnline('ok','online');
   } catch(err) {
     console.error(err);
-    setOnline('bad','Ошибка связи');
-    toast('Не удалось загрузить общую карту.');
+    setOnline('bad','connectionError');
+    toast(t('loadFailed'));
   }
 }
 
@@ -403,7 +518,7 @@ async function subscribeRealtime() {
     .on('postgres_changes',{event:'*',schema:'public',table:'markers',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
     .subscribe(status=>{
       if(status==='SUBSCRIBED') setOnline('ok','Онлайн');
-      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') setOnline('bad','Realtime ошибка');
+      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') setOnline('bad','realtimeError');
     });
 }
 
@@ -422,33 +537,33 @@ async function apiAction(action, payload={}, codeOverride=null) {
 async function addAlliance() {
   if(!requireEditor()) return;
   const tag=$('allianceName').value.trim().toUpperCase();
-  if(!tag){$('allianceMessage').textContent='Введите тег альянса.';return;}
+  if(!tag){$('allianceMessage').textContent=t('enterAlliance');return;}
   try {
     await apiAction('addAlliance',{tag,color:$('allianceColor').value});
     $('allianceName').value='';
-    $('allianceMessage').textContent=`Альянс ${tag} добавлен.`;
+    $('allianceMessage').textContent=t('allianceAdded',{tag});
     await refreshAll();
   } catch(error) {
-    $('allianceMessage').textContent='Ошибка: '+error.message;
+    $('allianceMessage').textContent=t('error',{error:error.message});
   }
 }
 
 async function deleteActiveAlliance() {
   if(!requireEditor()) return;
-  const a=activeAlliance(); if(!a){toast('Выберите альянс.');return;}
-  if(!confirm(`Удалить альянс ${a.tag} и очистить его территории?`)) return;
+  const a=activeAlliance(); if(!a){toast(t('chooseAlliance'));return;}
+  if(!confirm(t('confirmDelete',{tag:a.tag}))) return;
   try {
     await apiAction('deleteAlliance',{id:a.id});
     selectedAllianceId=null;
     await refreshAll();
   } catch(error) {
-    toast('Ошибка: '+error.message);
+    toast(t('error',{error:error.message}));
   }
 }
 
 async function paintRegion(id) {
   if(!requireEditor())return;
-  const a=activeAlliance(); if(!a){toast('Сначала выберите альянс.');return;}
+  const a=activeAlliance(); if(!a){toast(t('selectAllianceFirst'));return;}
   try {
     await apiAction('paint',{territoryId:id,allianceId:a.id});
   } catch(error) {
@@ -471,7 +586,7 @@ async function addMarker(x,y) {
   try {
     const result=await apiAction('addMarker',{
       x:Math.round(x),y:Math.round(y),
-      text:a?.tag||'Метка',
+      text:a?.tag||t('markerDefault'),
       comment:'',
       color:a?.color||'#d55353'
     });
@@ -491,11 +606,11 @@ async function saveSelectedMarker() {
   try {
     await apiAction('updateMarker',{
       id:m.id,
-      text:$('markerText').value.trim()||'Метка',
+      text:$('markerText').value.trim()||t('markerDefault'),
       color:$('markerColor').value,
       comment:$('markerComment').value
     });
-    toast('Метка сохранена.');
+    toast(t('markerSaved'));
     await refreshAll();
   } catch(error) {
     toast('Ошибка: '+error.message);
@@ -540,21 +655,21 @@ function zoom(factor,anchorX=viewport.clientWidth/2,anchorY=viewport.clientHeigh
 
 async function login() {
   const code=$('editorCode').value.trim();
-  if(!code){$('authMessage').textContent='Введите код редактора.';return;}
-  $('authMessage').textContent='Проверка…';
+  if(!code){$('authMessage').textContent=t('enterCode');return;}
+  $('authMessage').textContent=t('checking');
   try {
     await apiAction('verify',{},code);
     editorCode=code;
     sessionStorage.setItem('la_editor_code',code);
     isEditor=true;
     $('editorCode').value='';
-    $('authMessage').textContent='Режим редактора включён.';
+    $('authMessage').textContent=t('editorEnabled');
     updateAuthUi(); render();
   } catch(error) {
     isEditor=false;
     $('authMessage').textContent = error?.message === 'invalid editor code'
-      ? 'Неверный код редактора.'
-      : 'Ошибка входа: '+(error?.message || 'неизвестная ошибка');
+      ? t('invalidCode')
+      : t('loginError',{error:error?.message || t('unknownError')});
   }
 }
 async function logout(){
@@ -566,6 +681,12 @@ async function logout(){
 }
 
 function bind() {
+  $('languageSelect').addEventListener('change', () => {
+    currentLang = $('languageSelect').value === 'en' ? 'en' : 'ru';
+    localStorage.setItem('la_language', currentLang);
+    applyLanguage();
+    render();
+  });
   $('addAlliance').addEventListener('click',addAlliance);
   $('allianceName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addAlliance();}});
   $('deleteAlliance').addEventListener('click',deleteActiveAlliance);
@@ -580,10 +701,10 @@ function bind() {
 }
 
 async function initOnline() {
-  buildZones(); bind(); render();
+  buildZones(); bind(); applyLanguage(); render();
   if(!configured) {
     $('setupBox').classList.remove('hidden'); $('loginBox').classList.add('hidden');
-    setOnline('warn','Нужна настройка'); setEditingUi(); return;
+    setOnline('warn','setupNeeded'); setEditingUi(); return;
   }
   supabase=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   if(editorCode){
