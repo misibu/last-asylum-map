@@ -633,6 +633,7 @@ async function refreshAll() {
     if(!selectedAllianceId && data.alliances[0]) selectedAllianceId=data.alliances[0].id;
     if(selectedMarkerId && !data.markers.some(m=>m.id===selectedMarkerId)) selectedMarkerId=null;
     render();
+    updateAuthUi();
     setOnline('ok','online');
   } catch(err) {
     console.error(err);
@@ -654,7 +655,7 @@ async function subscribeRealtime() {
     .on('postgres_changes',{event:'*',schema:'public',table:'territories',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
     .on('postgres_changes',{event:'*',schema:'public',table:'markers',filter:`map_id=eq.${MAP_ID}`},scheduleRefresh)
     .subscribe(status=>{
-      if(status==='SUBSCRIBED') setOnline('ok','Онлайн');
+      if(status==='SUBSCRIBED') setOnline('ok','online');
       else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') setOnline('bad','realtimeError');
     });
 }
@@ -719,7 +720,7 @@ async function paintRegion(id) {
   try {
     await apiAction('paint',{territoryId:id,allianceId:a.id});
   } catch(error) {
-    toast('Ошибка: '+error.message);
+    toast(t('error',{error:error.message}));
   }
 }
 
