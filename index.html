@@ -356,7 +356,7 @@ function applyLanguage() {
   $('addAllianceTitle').textContent = t('addAlliance');
   $('allianceName').placeholder = t('alliancePlaceholder');
   $('allianceColor').setAttribute('aria-label', t('allianceColor'));
-  if (!isEditor && !$('allianceMessage').textContent.startsWith('Альянс') && !$('allianceMessage').textContent.startsWith('Alliance')) {
+  if (editorRole === 'viewer' && !$('allianceMessage').textContent.startsWith('Альянс') && !$('allianceMessage').textContent.startsWith('Alliance')) {
     $('allianceMessage').textContent = t('editAfterLogin');
   }
   $('alliancesTitle').textContent = t('alliances');
@@ -395,8 +395,14 @@ function applyLanguage() {
   $('alliancesCountLabel').textContent = t('alliancesCount');
   $('activeLabel').textContent = t('active');
   $('setupBox').textContent = t('setupBox');
-  $('accessSubtitle').textContent = isEditor ? t('editMode') : t('publicView');
-  if (isEditor) $('userEmail').textContent = t('codeAccess');
+  $('accessSubtitle').textContent = editorRole === 'viewer' ? t('publicView') : t('editMode');
+  if (editorRole !== 'viewer') {
+    if (isAdmin()) $('userEmail').textContent = t('codeAccess');
+    else {
+      const a=data.alliances.find(x=>x.id===editorAllianceId);
+      $('userEmail').textContent = a?.tag || '—';
+    }
+  }
   $('onlineText').textContent = t(currentOnlineKey);
   $('mobileEditorBtnText').textContent = t('mobileEditor');
   $('editorCloseBtn').setAttribute('aria-label', t('closeEditor'));
