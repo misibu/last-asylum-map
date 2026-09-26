@@ -349,6 +349,14 @@ function setEditingUi() {
   $('accessSubtitle').textContent = isEditor ? 'Режим редактирования' : 'Публичный просмотр';
 }
 
+function updateAuthUi() {
+  $('loginBox').classList.toggle('hidden', isEditor);
+  $('logoutBox').classList.toggle('hidden', !isEditor);
+  if (isEditor) $('userEmail').textContent = 'Доступ по коду';
+  $('authMessage').textContent = isEditor ? 'Режим редактора включён.' : '';
+  setEditingUi();
+}
+
 function render() {
   renderAlliances(); renderZones(); renderMarkers(); renderMarkerEditor(); setEditingUi(); applyView();
 }
@@ -415,40 +423,64 @@ async function addAlliance() {
   if(!requireEditor()) return;
   const tag=$('allianceName').value.trim().toUpperCase();
   if(!tag){$('allianceMessage').textContent='Введите тег альянса.';return;}
-  const {error}=await supabase.from('alliances').insert({map_id:MAP_ID,tag,color:$('allianceColor').value,created_by:user?.id||null});
-  if(error){$('allianceMessage').textContent=error.code==='23505'?'Такой альянс уже есть.':`Ошибка: ${error.message}`;return;}
-  $('allianceName').value=''; $('allianceMessage').textContent=`Альянс ${tag} добавлен.`; await refreshAll();
+  try {
+    await apiAction('addAlliance',{tag,color:$('allianceColor').value});
+    $('allianceName').value='';
+    $('allianceMessage').textContent=`Альянс ${tag} добавлен.`;
+    await refreshAll();
+  } catch(error) {
+    $('allianceMessage').textContent='Ошибка: '+error.message;
+  }
 }
 
 async function deleteActiveAlliance() {
   if(!requireEditor()) return;
   const a=activeAlliance(); if(!a){toast('Выберите альянс.');return;}
   if(!confirm(`Удалить альянс ${a.tag} и очистить его территории?`)) return;
-  const {error}=await supabase.from('alliances').delete().eq('id',a.id).eq('map_id',MAP_ID);
-  if(error){toast(`Ошибка: ${error.message}`);return;}
-  selectedAllianceId=null; await refreshAll();
+  try {
+    await apiAction('deleteAlliance',{id:a.id});
+    selectedAllianceId=null;
+    await refreshAll();
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 async function paintRegion(id) {
   if(!requireEditor())return;
   const a=activeAlliance(); if(!a){toast('Сначала выберите альянс.');return;}
-  const {error}=await supabase.from('territories').upsert({map_id:MAP_ID,territory_id:id,alliance_id:a.id,updated_at:new Date().toISOString(),updated_by:user?.id||null},{onConflict:'map_id,territory_id'});
-  if(error)toast(`Ошибка: ${error.message}`);
+  try {
+    await apiAction('paint',{territoryId:id,allianceId:a.id});
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 async function clearRegion(id) {
   if(!requireEditor())return;
-  const {error}=await supabase.from('territories').delete().eq('map_id',MAP_ID).eq('territory_id',id);
-  if(error)toast(`Ошибка: ${error.message}`);
+  try {
+    await apiAction('clear',{territoryId:id});
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 async function addMarker(x,y) {
   if(!requireEditor())return;
   const a=activeAlliance();
-  const payload={map_id:MAP_ID,x:Math.round(x),y:Math.round(y),text:a?.tag||'Метка',comment:'',color:a?.color||'#d55353',created_by:user?.id||null};
-  const {data:rows,error}=await supabase.from('markers').insert(payload).select('id,x,y,text,comment,color,created_at').single();
-  if(error){toast(`Ошибка: ${error.message}`);return;}
-  selectedMarkerId=rows.id; await refreshAll(); selectedMarkerId=rows.id; render();
+  try {
+    const result=await apiAction('addMarker',{
+      x:Math.round(x),y:Math.round(y),
+      text:a?.tag||'Метка',
+      comment:'',
+      color:a?.color||'#d55353'
+    });
+    selectedMarkerId=result.id||null;
+    await refreshAll();
+    if(result.id){selectedMarkerId=result.id;render();}
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 function selectMarker(id){ selectedMarkerId=id; render(); }
@@ -456,16 +488,29 @@ function selectMarker(id){ selectedMarkerId=id; render(); }
 async function saveSelectedMarker() {
   if(!requireEditor())return;
   const m=markerById(selectedMarkerId); if(!m)return;
-  const payload={text:$('markerText').value.trim()||'Метка',color:$('markerColor').value,comment:$('markerComment').value,updated_at:new Date().toISOString()};
-  const {error}=await supabase.from('markers').update(payload).eq('id',m.id).eq('map_id',MAP_ID);
-  if(error)toast(`Ошибка: ${error.message}`); else toast('Метка сохранена.');
+  try {
+    await apiAction('updateMarker',{
+      id:m.id,
+      text:$('markerText').value.trim()||'Метка',
+      color:$('markerColor').value,
+      comment:$('markerComment').value
+    });
+    toast('Метка сохранена.');
+    await refreshAll();
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 async function deleteMarker(id) {
   if(!requireEditor())return;
-  const {error}=await supabase.from('markers').delete().eq('id',id).eq('map_id',MAP_ID);
-  if(error){toast(`Ошибка: ${error.message}`);return;}
-  if(selectedMarkerId===id)selectedMarkerId=null; await refreshAll();
+  try {
+    await apiAction('deleteMarker',{id});
+    if(selectedMarkerId===id)selectedMarkerId=null;
+    await refreshAll();
+  } catch(error) {
+    toast('Ошибка: '+error.message);
+  }
 }
 
 function screenToMap(clientX,clientY) {
@@ -507,7 +552,9 @@ async function login() {
     updateAuthUi(); render();
   } catch(error) {
     isEditor=false;
-    $('authMessage').textContent='Неверный код редактора.';
+    $('authMessage').textContent = error?.message === 'invalid editor code'
+      ? 'Неверный код редактора.'
+      : 'Ошибка входа: '+(error?.message || 'неизвестная ошибка');
   }
 }
 async function logout(){
