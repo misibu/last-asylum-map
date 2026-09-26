@@ -135,7 +135,7 @@ textarea{min-height:92px;resize:vertical}
     </section>
 
     <div class="bottom-actions">
-      <button id="setAllianceMarkerCode" class="btn" type="button" style="width:100%;margin-bottom:8px">🔑 Код меток альянса</button>
+      <button id="createAllianceEditLink" class="btn" type="button" style="width:100%;margin-bottom:8px">🔑 Код меток альянса</button>
       <button id="deleteAlliance" class="btn danger" type="button" style="width:100%">Удалить альянс</button>
     </div>
   </aside>
@@ -189,14 +189,7 @@ textarea{min-height:92px;resize:vertical}
       <div class="section-title" id="editorSectionTitle">Редактор</div>
       <div id="setupBox" class="setup-box hidden">Supabase ещё не настроен. Заполните <b>config.js</b>, затем обновите страницу.</div>
       <div id="loginBox" class="auth-grid">
-        <div class="small" id="allianceAccessTitle"><b>Альянс — только свои метки</b></div>
-        <select id="allianceLoginSelect" class="auth-select"></select>
-        <input id="allianceEditorCode" type="password" autocomplete="off" placeholder="Код альянса">
-        <button id="allianceLoginBtn" class="btn primary" type="button">Войти для меток</button>
-        <div style="height:1px;background:var(--line);margin:5px 0"></div>
-        <div class="small" id="adminAccessTitle"><b>Администратор карты</b></div>
-        <input id="editorCode" type="password" autocomplete="off" placeholder="Код администратора">
-        <button id="loginBtn" class="btn" type="button">Войти как администратор</button>
+        <div class="small" id="accessByLinkInfo">Редактирование открывается автоматически по персональной ссылке. Пароль вводить не нужно.</div>
       </div>
       <div id="logoutBox" class="hidden">
         <div class="status-card">
@@ -285,9 +278,9 @@ const I18N = {
     invalidCode:'Неверный код редактора.', loginError:'Ошибка входа: {error}', unknownError:'неизвестная ошибка',
     setupBox:'Supabase ещё не настроен. Обновите конфигурацию и перезагрузите страницу.',
     royal:'Royal', city:'City', mobileEditor:'Редактор', closeEditor:'Закрыть',
-    allianceMarkerCode:'Код меток альянса', allianceOnlyMarkers:'Альянс — только свои метки',
-    allianceCode:'Код альянса', allianceLogin:'Войти для меток', adminAccess:'Администратор карты',
-    adminCode:'Код администратора', adminLogin:'Войти как администратор', administrator:'Администратор',
+    allianceMarkerCode:'Ссылка альянса', administrator:'Администратор',
+    accessByLink:'Редактирование открывается автоматически по персональной ссылке. Пароль вводить не нужно.',
+    allianceLinkCopied:'Ссылка для альянса {tag} скопирована.', allianceLinkTitle:'Ссылка для редактирования меток {tag}:',
     allianceRole:'Альянс {tag}', markerOwner:'Владелец: {tag}', markerOwnerNone:'Владелец: администратор',
     foreignMarker:'Эта метка принадлежит другому альянсу.', adminRequired:'Это действие доступно только администратору.',
     setAllianceCodePrompt:'Введите код для редактирования меток альянса {tag}:',
@@ -316,9 +309,9 @@ const I18N = {
     invalidCode:'Incorrect editor code.', loginError:'Login error: {error}', unknownError:'unknown error',
     setupBox:'Supabase is not configured yet. Update the configuration and reload the page.',
     royal:'Royal', city:'City', mobileEditor:'Editor', closeEditor:'Close',
-    allianceMarkerCode:'Alliance marker code', allianceOnlyMarkers:'Alliance — own markers only',
-    allianceCode:'Alliance code', allianceLogin:'Sign in for markers', adminAccess:'Map administrator',
-    adminCode:'Administrator code', adminLogin:'Sign in as administrator', administrator:'Administrator',
+    allianceMarkerCode:'Alliance edit link', administrator:'Administrator',
+    accessByLink:'Editing opens automatically from a personal link. No password is required.',
+    allianceLinkCopied:'The edit link for {tag} was copied.', allianceLinkTitle:'Marker editing link for {tag}:',
     allianceRole:'Alliance {tag}', markerOwner:'Owner: {tag}', markerOwnerNone:'Owner: administrator',
     foreignMarker:'This marker belongs to another alliance.', adminRequired:'This action is available to the administrator only.',
     setAllianceCodePrompt:'Enter a marker editing code for alliance {tag}:',
@@ -360,7 +353,7 @@ function applyLanguage() {
     $('allianceMessage').textContent = t('editAfterLogin');
   }
   $('alliancesTitle').textContent = t('alliances');
-  $('setAllianceMarkerCode').textContent = '🔑 ' + t('allianceMarkerCode');
+  $('createAllianceEditLink').textContent = '🔗 ' + t('allianceMarkerCode');
   $('deleteAlliance').textContent = t('deleteAlliance');
   $('toolPaintText').textContent = t('paint');
   $('toolMarkerText').textContent = t('marker');
@@ -369,12 +362,7 @@ function applyLanguage() {
   $('resetView').textContent = t('reset');
   $('accessTitle').textContent = t('accessTitle');
   $('editorSectionTitle').textContent = t('editor');
-  $('allianceAccessTitle').innerHTML = '<b>'+t('allianceOnlyMarkers')+'</b>';
-  $('allianceEditorCode').placeholder = t('allianceCode');
-  $('allianceLoginBtn').textContent = t('allianceLogin');
-  $('adminAccessTitle').innerHTML = '<b>'+t('adminAccess')+'</b>';
-  $('editorCode').placeholder = t('adminCode');
-  $('loginBtn').textContent = t('adminLogin');
+  $('accessByLinkInfo').textContent = t('accessByLink');
   $('modeLabel').textContent = t('mode');
   $('editorModeValue').textContent = t('editor');
   $('userLabel').textContent = t('user');
@@ -498,18 +486,6 @@ function renderAlliances() {
   }
   $('statAlliances').textContent = String(data.alliances.length);
   $('statActiveAlliance').textContent = activeAlliance()?.tag || '—';
-
-  const loginSelect = $('allianceLoginSelect');
-  const previous = loginSelect.value || editorAllianceId;
-  loginSelect.innerHTML = '';
-  for (const a of data.alliances) {
-    const option = document.createElement('option');
-    option.value = a.id;
-    option.textContent = a.tag;
-    loginSelect.appendChild(option);
-  }
-  if (previous && data.alliances.some(a => a.id === previous)) loginSelect.value = previous;
-  else if (data.alliances[0]) loginSelect.value = data.alliances[0].id;
 }
 
 function renderZones() {
@@ -574,7 +550,7 @@ function setEditingUi() {
   $('addAlliance').disabled=!admin || !configured;
   $('allianceName').disabled=!admin || !configured;
   $('allianceColor').disabled=!admin || !configured;
-  $('setAllianceMarkerCode').disabled=!admin || !configured || !activeAlliance();
+  $('createAllianceEditLink').disabled=!admin || !configured || !activeAlliance();
   $('deleteAlliance').disabled=!admin || !configured;
   document.querySelector('[data-tool="paint"]').disabled=!admin || !configured;
   document.querySelector('[data-tool="marker"]').disabled=!markerEditor || !configured;
@@ -585,6 +561,7 @@ function setEditingUi() {
   $('saveMarker').disabled=!mayEditSelected;
   $('deleteMarker').disabled=!mayEditSelected;
 
+  $('mobileEditorBtn').classList.toggle('hidden', editorRole==='viewer');
   if(editorRole==='viewer' && tool!=='pan') tool='pan';
   if(isAllianceEditor() && tool==='paint') tool='pan';
   document.querySelectorAll('.tool').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===tool));
@@ -699,16 +676,19 @@ async function deleteActiveAlliance() {
   }
 }
 
-async function setAllianceMarkerCode() {
+async function createAllianceEditLink() {
   if(!requireAdmin()) return;
   const a=activeAlliance();
   if(!a){toast(t('chooseAlliance'));return;}
-  const code=prompt(t('setAllianceCodePrompt',{tag:a.tag}), '');
-  if(code===null) return;
-  if(code.trim().length<4){toast(t('enterCode'));return;}
   try {
-    await apiAction('setAllianceMarkerCode',{allianceId:a.id,code:code.trim()});
-    toast(t('codeSet',{tag:a.tag}));
+    const result=await apiAction('createAllianceLink',{allianceId:a.id});
+    const url=location.origin + location.pathname + '#alliance=' + encodeURIComponent(a.id) + '&token=' + encodeURIComponent(result.token);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast(t('allianceLinkCopied',{tag:a.tag}));
+    } catch {
+      prompt(t('allianceLinkTitle',{tag:a.tag}), url);
+    }
   } catch(error) {
     toast(t('error',{error:error.message}));
   }
@@ -825,51 +805,30 @@ function zoom(factor,anchorX=viewport.clientWidth/2,anchorY=viewport.clientHeigh
   view.x=(view.x-cx)*(next/old)+cx; view.y=(view.y-cy)*(next/old)+cy; view.scale=next; applyView();
 }
 
-async function loginAdmin() {
-  const code=$('editorCode').value.trim();
-  if(!code){$('authMessage').textContent=t('enterCode');return;}
-  $('authMessage').textContent=t('checking');
-  try {
-    await apiAction('verify',{},code);
-    editorCode=code;
-    editorRole='admin';
-    editorAllianceId='';
-    sessionStorage.setItem('la_editor_code',code);
-    sessionStorage.setItem('la_editor_role','admin');
+function readAccessLink() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const adminToken = hash.get('admin');
+  const allianceId = hash.get('alliance');
+  const token = hash.get('token');
+
+  if (adminToken) {
+    editorCode = adminToken;
+    editorRole = 'admin';
+    editorAllianceId = '';
+    sessionStorage.setItem('la_editor_code', editorCode);
+    sessionStorage.setItem('la_editor_role', 'admin');
     sessionStorage.removeItem('la_editor_alliance_id');
-    $('editorCode').value='';
-    updateAuthUi(); render();
-  } catch(error) {
-    editorRole='viewer';
-    $('authMessage').textContent = error?.message === 'invalid editor code'
-      ? t('invalidCode')
-      : t('loginError',{error:error?.message || t('unknownError')});
+  } else if (allianceId && token) {
+    editorCode = token;
+    editorRole = 'alliance';
+    editorAllianceId = allianceId;
+    selectedAllianceId = allianceId;
+    sessionStorage.setItem('la_editor_code', editorCode);
+    sessionStorage.setItem('la_editor_role', 'alliance');
+    sessionStorage.setItem('la_editor_alliance_id', allianceId);
   }
 }
-async function loginAlliance() {
-  const allianceId=$('allianceLoginSelect').value;
-  const code=$('allianceEditorCode').value.trim();
-  if(!allianceId){$('authMessage').textContent=t('chooseAllianceLogin');return;}
-  if(!code){$('authMessage').textContent=t('enterCode');return;}
-  $('authMessage').textContent=t('checking');
-  try {
-    await apiAction('verifyAlliance',{allianceId},code);
-    editorCode=code;
-    editorRole='alliance';
-    editorAllianceId=allianceId;
-    selectedAllianceId=allianceId;
-    sessionStorage.setItem('la_editor_code',code);
-    sessionStorage.setItem('la_editor_role','alliance');
-    sessionStorage.setItem('la_editor_alliance_id',allianceId);
-    $('allianceEditorCode').value='';
-    updateAuthUi(); render();
-  } catch(error) {
-    editorRole='viewer';
-    $('authMessage').textContent = error?.message === 'invalid alliance code'
-      ? t('allianceCodeInvalid')
-      : t('loginError',{error:error?.message || t('unknownError')});
-  }
-}
+
 async function logout(){
   editorCode='';
   editorRole='viewer';
@@ -878,6 +837,7 @@ async function logout(){
   sessionStorage.removeItem('la_editor_role');
   sessionStorage.removeItem('la_editor_alliance_id');
   selectedMarkerId=null;
+  history.replaceState(null, '', location.pathname + location.search);
   updateAuthUi();render();
 }
 
@@ -907,17 +867,13 @@ function bind() {
   });
   $('addAlliance').addEventListener('click',addAlliance);
   $('allianceName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addAlliance();}});
-  $('setAllianceMarkerCode').addEventListener('click',setAllianceMarkerCode);
+  $('createAllianceEditLink').addEventListener('click',createAllianceEditLink);
   $('deleteAlliance').addEventListener('click',deleteActiveAlliance);
   $('zoomIn').addEventListener('click',()=>zoom(1.12)); $('zoomOut').addEventListener('click',()=>zoom(1/1.12)); $('resetView').addEventListener('click',()=>{view={scale:1,x:0,y:0};applyView();});
   document.querySelectorAll('.tool').forEach(btn=>btn.addEventListener('click',()=>{if(btn.disabled)return;tool=btn.dataset.tool;render();}));
   viewport.addEventListener('pointerdown',pointerDown); window.addEventListener('pointermove',pointerMove); window.addEventListener('pointerup',pointerUp);
   viewport.addEventListener('contextmenu',e=>e.preventDefault());
   viewport.addEventListener('wheel',e=>{e.preventDefault();const r=viewport.getBoundingClientRect();zoom(e.deltaY<0?1.08:1/1.08,e.clientX-r.left,e.clientY-r.top);},{passive:false});
-  $('loginBtn').addEventListener('click',loginAdmin);
-  $('editorCode').addEventListener('keydown',e=>{if(e.key==='Enter')loginAdmin();});
-  $('allianceLoginBtn').addEventListener('click',loginAlliance);
-  $('allianceEditorCode').addEventListener('keydown',e=>{if(e.key==='Enter')loginAlliance();});
   $('logoutBtn').addEventListener('click',logout);
   $('markerColor').addEventListener('input',()=>$('previewPin').style.background=$('markerColor').value);
   $('saveMarker').addEventListener('click',saveSelectedMarker); $('deleteMarker').addEventListener('click',()=>{if(selectedMarkerId)deleteMarker(selectedMarkerId);});
@@ -930,6 +886,7 @@ async function initOnline() {
     setOnline('warn','setupNeeded'); setEditingUi(); return;
   }
   supabase=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  readAccessLink();
   if(editorCode && editorRole==='admin'){
     try { await apiAction('verify',{},editorCode); }
     catch {
