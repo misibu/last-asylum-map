@@ -63,8 +63,35 @@ textarea{min-height:92px;resize:vertical}
 .auth-grid{display:grid;gap:8px} .hidden{display:none!important}
 .setup-box{padding:12px;border:1px solid #6f5b36;border-radius:12px;background:#2a2418;color:#ead7af;font-size:12px;line-height:1.5}
 .toast{position:absolute;right:14px;top:14px;z-index:10;max-width:380px;padding:10px 12px;border-radius:10px;background:#121a15;border:1px solid #395044;color:#eaf2ec;font-size:12px;box-shadow:0 8px 26px rgba(0,0,0,.28)}
-@media(max-width:1100px){.app{grid-template-columns:260px minmax(0,1fr)}.editor{display:none}}
-@media(max-width:820px){.app{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--line)}.viewport{min-height:70vh}.mover{width:96%}.coord{display:none}}
+.mobile-editor-btn{display:none}
+.mobile-editor-overlay{display:none}
+.editor-close{display:none}
+@media(max-width:1100px){
+  .app{grid-template-columns:260px minmax(0,1fr)}
+  .mobile-editor-btn{display:inline-flex}
+  .editor{
+    display:flex;
+    position:fixed;
+    top:0;right:0;bottom:0;
+    width:min(92vw,380px);
+    z-index:40;
+    transform:translateX(105%);
+    transition:transform .22s ease;
+    box-shadow:-18px 0 38px rgba(0,0,0,.42);
+    overflow:auto;
+  }
+  .editor.mobile-open{transform:translateX(0)}
+  .editor-close{display:block;position:absolute;right:12px;top:12px;z-index:2;width:38px;height:38px;border-radius:10px;border:1px solid #35453b;background:#202a24;color:var(--text);font-size:22px;cursor:pointer}
+  .mobile-editor-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:35;opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .mobile-editor-overlay.show{opacity:1;pointer-events:auto}
+}
+@media(max-width:820px){
+  .app{grid-template-columns:1fr}
+  .sidebar{border-right:0;border-bottom:1px solid var(--line)}
+  .viewport{min-height:70vh}
+  .mover{width:96%}
+  .coord{display:none}
+}
 </style>
 </head>
 <body>
@@ -104,6 +131,7 @@ textarea{min-height:92px;resize:vertical}
         <button class="tool" data-tool="erase" type="button">🧽 <span id="toolEraseText">Ластик</span></button>
       </div>
       <div class="spacer"></div>
+      <button id="mobileEditorBtn" class="btn mobile-editor-btn" type="button">🔐 <span id="mobileEditorBtnText">Редактор</span></button>
       <select id="languageSelect" class="language-select" aria-label="Language">
         <option value="ru">Русский</option>
         <option value="en">English</option>
@@ -133,7 +161,8 @@ textarea{min-height:92px;resize:vertical}
     </div>
   </main>
 
-  <aside class="editor">
+  <aside class="editor" id="editorPanel">
+    <button id="editorCloseBtn" class="editor-close" type="button" aria-label="Close">×</button>
     <div class="head">
       <div class="title" id="accessTitle" style="font-size:19px">Доступ и метки</div>
       <div class="subtitle" id="accessSubtitle">Публичный просмотр</div>
@@ -177,6 +206,7 @@ textarea{min-height:92px;resize:vertical}
     </section>
   </aside>
 </div>
+<div id="mobileEditorOverlay" class="mobile-editor-overlay"></div>
 
 <script>
 window.LAST_ASYLUM_CONFIG = {
@@ -229,7 +259,7 @@ const I18N = {
     enterCode:'Введите код редактора.', checking:'Проверка…', editorEnabled:'Режим редактора включён.',
     invalidCode:'Неверный код редактора.', loginError:'Ошибка входа: {error}', unknownError:'неизвестная ошибка',
     setupBox:'Supabase ещё не настроен. Обновите конфигурацию и перезагрузите страницу.',
-    royal:'Royal', city:'City'
+    royal:'Royal', city:'City', mobileEditor:'Editor', closeEditor:'Close', mobileEditor:'Редактор', closeEditor:'Закрыть'
   },
   en: {
     mainSubtitle:'ONLINE · one shared map for all players.',
@@ -323,6 +353,8 @@ function applyLanguage() {
   $('accessSubtitle').textContent = isEditor ? t('editMode') : t('publicView');
   if (isEditor) $('userEmail').textContent = t('codeAccess');
   $('onlineText').textContent = t(currentOnlineKey);
+  $('mobileEditorBtnText').textContent = t('mobileEditor');
+  $('editorCloseBtn').setAttribute('aria-label', t('closeEditor'));
   const royal = royalLayer.querySelector('.royal-label');
   const city = royalLayer.querySelector('.royal-sub');
   if (royal) royal.textContent = t('royal');
@@ -592,13 +624,21 @@ async function addMarker(x,y) {
     });
     selectedMarkerId=result.id||null;
     await refreshAll();
-    if(result.id){selectedMarkerId=result.id;render();}
+    if(result.id){
+      selectedMarkerId=result.id;
+      render();
+      if (window.matchMedia('(max-width:1100px)').matches) openEditorPanel();
+    }
   } catch(error) {
     toast('Ошибка: '+error.message);
   }
 }
 
-function selectMarker(id){ selectedMarkerId=id; render(); }
+function selectMarker(id){
+  selectedMarkerId=id;
+  render();
+  if (window.matchMedia('(max-width:1100px)').matches) openEditorPanel();
+}
 
 async function saveSelectedMarker() {
   if(!requireEditor())return;
@@ -680,7 +720,19 @@ async function logout(){
   updateAuthUi();render();
 }
 
+function openEditorPanel() {
+  $('editorPanel').classList.add('mobile-open');
+  $('mobileEditorOverlay').classList.add('show');
+}
+function closeEditorPanel() {
+  $('editorPanel').classList.remove('mobile-open');
+  $('mobileEditorOverlay').classList.remove('show');
+}
+
 function bind() {
+  $('mobileEditorBtn').addEventListener('click', openEditorPanel);
+  $('editorCloseBtn').addEventListener('click', closeEditorPanel);
+  $('mobileEditorOverlay').addEventListener('click', closeEditorPanel);
   $('languageSelect').addEventListener('change', () => {
     currentLang = $('languageSelect').value === 'en' ? 'en' : 'ru';
     localStorage.setItem('la_language', currentLang);
